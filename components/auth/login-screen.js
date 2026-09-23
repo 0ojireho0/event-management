@@ -19,15 +19,15 @@ function BrandMark({ compact = false }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className={`flex shrink-0 items-center justify-center rounded-lg bg-[#3525cd] text-white shadow-[0_1px_8px_rgba(0,0,0,0.04)] ${
+        className={`flex shrink-0 items-center justify-center rounded-lg bg-[#f6671e] text-white shadow-[0_1px_8px_rgba(0,0,0,0.04)] ${
           compact ? "size-8" : "size-10 rounded-xl"
         }`}
       >
         <User className={compact ? "size-4.5" : "size-5.5"} />
       </div>
       {compact && (
-        <span className="text-xl leading-7 font-bold tracking-tight text-[#131b2e]">
-          EVORA
+        <span className="text-xl leading-7 font-bold tracking-tight text-[#25170f]">
+          Hype Event Hub
         </span>
       )}
     </div>
@@ -63,7 +63,7 @@ function LoginForm({ onLogin }) {
           error,
           "The API could not be reached. Make sure the Laravel server is running.",
         ),
-        confirmButtonColor: "#4f46e5",
+        confirmButtonColor: "#dc4f0a",
       });
     } finally {
       setIsSubmitting(false);
@@ -73,11 +73,11 @@ function LoginForm({ onLogin }) {
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div>
-        <label htmlFor="work-email" className="mb-1.5 block text-xs leading-4 font-medium text-[#131b2e]">
+        <label htmlFor="work-email" className="mb-1.5 block text-xs leading-4 font-medium text-[#25170f]">
           Work Email
         </label>
         <div className="relative flex items-center">
-          <Mail className="pointer-events-none absolute left-3.5 size-4.5 text-[#777587]" />
+          <Mail className="pointer-events-none absolute left-3.5 size-4.5 text-[#96877f]" />
           <Input
             id="work-email"
             name="email"
@@ -86,18 +86,18 @@ function LoginForm({ onLogin }) {
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="email"
             placeholder="test@example.com"
-            className="h-10 rounded-lg bg-[#f2f3ff] pr-4 pl-10 shadow-sm transition-all focus-visible:bg-white focus-visible:ring-[#3525cd]"
+            className="h-10 rounded-lg bg-[#fff4ee] pr-4 pl-10 shadow-sm transition-all focus-visible:bg-white focus-visible:ring-[#f6671e]"
             required
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="password" className="mb-1.5 block text-xs leading-4 font-medium text-[#131b2e]">
+        <label htmlFor="password" className="mb-1.5 block text-xs leading-4 font-medium text-[#25170f]">
           Password
         </label>
         <div className="relative flex items-center">
-          <LockKeyhole className="pointer-events-none absolute left-3.5 size-4.5 text-[#777587]" />
+          <LockKeyhole className="pointer-events-none absolute left-3.5 size-4.5 text-[#96877f]" />
           <Input
             id="password"
             name="password"
@@ -106,7 +106,7 @@ function LoginForm({ onLogin }) {
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
             placeholder="Enter your password"
-            className="h-10 rounded-lg bg-[#f2f3ff] pr-4 pl-10 shadow-sm transition-all focus-visible:bg-white focus-visible:ring-[#3525cd]"
+            className="h-10 rounded-lg bg-[#fff4ee] pr-4 pl-10 shadow-sm transition-all focus-visible:bg-white focus-visible:ring-[#f6671e]"
             required
           />
         </div>
@@ -115,7 +115,7 @@ function LoginForm({ onLogin }) {
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="mt-4 h-12 w-full rounded-lg bg-[#4f46e5] px-6 text-sm shadow-md hover:bg-[#3525cd] hover:shadow-lg active:scale-[0.99]"
+        className="mt-4 h-12 w-full rounded-lg bg-[#dc4f0a] px-6 text-sm shadow-md hover:bg-[#f6671e] hover:shadow-lg active:scale-[0.99]"
       >
         {isSubmitting ? (
           <>
@@ -139,17 +139,17 @@ function LoginCard({ onLogin }) {
       <CardContent className="p-6 sm:p-8">
         <div className="mb-6 flex flex-col items-center text-center">
           <BrandMark />
-          <h1 className="mt-2 text-2xl leading-8 font-bold tracking-tight text-[#131b2e]">
+          <h1 className="mt-2 text-2xl leading-8 font-bold tracking-tight text-[#25170f]">
             Welcome back
           </h1>
-          <p className="mt-1 text-sm leading-5 text-[#464555]">
+          <p className="mt-1 text-sm leading-5 text-[#6f625b]">
             Sign in with your event management account.
           </p>
         </div>
 
         <LoginForm onLogin={onLogin} />
 
-        {/* <div className="mt-6 flex items-start justify-center gap-1.5 border-t border-[#dae2fd] pt-4 text-[#464555] sm:items-center">
+        {/* <div className="mt-6 flex items-start justify-center gap-1.5 border-t border-[#f3c7b2] pt-4 text-[#6f625b] sm:items-center">
           <BadgeCheck className="mt-0.5 size-4 shrink-0 text-[#006c49] sm:mt-0" />
           <span className="text-center text-[11px] leading-4">
             Created by Jeremiah & Greian
@@ -162,15 +162,15 @@ function LoginCard({ onLogin }) {
 
 function LoginFooter() {
   return (
-    <footer className="flex w-full flex-col items-center justify-center gap-2 px-4 py-4 text-[#464555] sm:flex-row sm:px-8">
-      <span className="text-xs leading-4">© 2026 EVORA. All rights reserved.</span>
+    <footer className="flex w-full flex-col items-center justify-center gap-2 px-4 py-4 text-[#6f625b] sm:flex-row sm:px-8">
+      <span className="text-xs leading-4">© 2026 Hype Event Hub. All rights reserved.</span>
     </footer>
   );
 }
 
 export default function LoginScreen({ onLogin }) {
   return (
-    <div className="flex min-h-screen flex-col justify-between bg-[#faf8ff] text-[#131b2e]">
+    <div className="flex min-h-screen flex-col justify-between bg-[#fffaf7] text-[#25170f]">
       <LoginHeader />
       <main className="relative flex w-full flex-1 flex-col items-center justify-center p-4 sm:p-8">
         <LoginCard onLogin={onLogin} />

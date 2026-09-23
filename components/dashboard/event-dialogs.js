@@ -25,9 +25,9 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const fieldLabel =
-  "mb-1 block text-[11px] leading-4 font-semibold text-[#464555] uppercase";
+  "mb-1 block text-[11px] leading-4 font-semibold text-[#6f625b] uppercase";
 const selectClass =
-  "h-10 w-full rounded-xl border-0 bg-[#f2f3ff] px-3 text-sm text-[#131b2e] outline-none focus:ring-2 focus:ring-[#3525cd]/25";
+  "h-10 w-full rounded-xl border-0 bg-[#fff4ee] px-3 text-sm text-[#25170f] outline-none focus:ring-2 focus:ring-[#f6671e]/25";
 
 export { CreateEventDialog } from "@/components/dashboard/create-event-dialog";
 
@@ -37,7 +37,7 @@ function DialogHeading({ icon: Icon, title, description, tone = "primary" }) {
       <div
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
-          tone === "success" ? "bg-[#006c49]" : "bg-[#3525cd]",
+          tone === "success" ? "bg-[#006c49]" : "bg-[#f6671e]",
         )}
       >
         <Icon className="size-5" />
@@ -57,7 +57,7 @@ function ScannerPanel({ onToast }) {
       icon: ShieldCheck,
       title: "Ready for Gate Optical Read",
       detail: "Gate Scanner Device #04 is connected",
-      classes: "bg-[#f2f3ff] text-[#131b2e]",
+      classes: "bg-[#fff4ee] text-[#25170f]",
       iconClasses: "text-[#006c49]",
     },
     success: {
@@ -94,7 +94,7 @@ function ScannerPanel({ onToast }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-center text-xs leading-4 text-[#464555]">
+      <p className="text-center text-xs leading-4 text-[#6f625b]">
         Choose a condition to simulate the response shown on a field scanner.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -135,9 +135,9 @@ function ScannerPanel({ onToast }) {
 function PassPanel({ onToast }) {
   return (
     <div className="flex flex-col items-center space-y-4 text-center">
-      <div className="flex w-60 flex-col items-center rounded-2xl bg-[#f2f3ff] p-4 shadow-sm">
+      <div className="flex w-60 flex-col items-center rounded-2xl bg-[#fff4ee] p-4 shadow-sm">
         <div className="my-3 flex size-36 items-center justify-center rounded-xl bg-white p-2 shadow-inner">
-          <QrCode className="size-28 stroke-[1.5] text-[#131b2e]" />
+          <QrCode className="size-28 stroke-[1.5] text-[#25170f]" />
         </div>
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#6cf8bb] px-2 py-0.5 text-[11px] font-semibold text-[#00714d]">
           <span className="size-1.5 animate-pulse rounded-full bg-[#006c49]" /> Pass Validated
@@ -150,17 +150,17 @@ function PassPanel({ onToast }) {
 function VotingPanel({ onToast }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f2f3ff] p-3">
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-[#fff4ee] p-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-[#3525cd]">#1</span>
+          <span className="text-sm font-bold text-[#f6671e]">#1</span>
           <div>
-            <div className="text-xs font-bold text-[#131b2e]">Sophia Lauren (Global Ops)</div>
-            <span className="text-xs text-[#464555]">Innovation Champion</span>
+            <div className="text-xs font-bold text-[#25170f]">Sophia Lauren (Global Ops)</div>
+            <span className="text-xs text-[#6f625b]">Innovation Champion</span>
           </div>
         </div>
         <div className="text-right">
           <span className="text-sm font-bold text-[#006c49]">642 votes</span>
-          <span className="block text-[11px] text-[#464555]">42.8%</span>
+          <span className="block text-[11px] text-[#6f625b]">42.8%</span>
         </div>
       </div>
       <Button
@@ -180,11 +180,11 @@ function RafflePanel({ onToast }) {
 
   return (
     <div className="flex flex-col items-center space-y-4 text-center">
-      <div className="w-full rounded-2xl bg-[#f2f3ff] p-6">
+      <div className="w-full rounded-2xl bg-[#fff4ee] p-6">
         <span className="text-[11px] font-semibold text-[#684000] uppercase">
           Grand Prize: Leadership Summit Trip
         </span>
-        <div className={cn("my-4 text-2xl leading-8 font-bold", winner.includes("Li Wei") ? "text-[#006c49]" : "text-[#131b2e]")}> 
+        <div className={cn("my-4 text-2xl leading-8 font-bold", winner.includes("Li Wei") ? "text-[#006c49]" : "text-[#25170f]")}>
           {winner}
         </div>
         <Button
@@ -205,20 +205,20 @@ function RafflePanel({ onToast }) {
 function SettingsPanel({ onToast }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-xl bg-[#f2f3ff] p-3">
+      <div className="rounded-xl bg-[#fff4ee] p-3">
         <label htmlFor="settings-name" className={fieldLabel}>
           Event Name & Primary Slug
         </label>
         <Input id="settings-name" className="bg-white" defaultValue="Annual Corporate Gala 2026" />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl bg-[#f2f3ff] p-3">
+        <div className="rounded-xl bg-[#fff4ee] p-3">
           <label htmlFor="settings-limit" className={fieldLabel}>
             Invited Quorum Limit
           </label>
           <Input id="settings-limit" className="bg-white" type="number" defaultValue="2500" />
         </div>
-        <div className="rounded-xl bg-[#f2f3ff] p-3">
+        <div className="rounded-xl bg-[#fff4ee] p-3">
           <label htmlFor="settings-raffle" className={fieldLabel}>
             Raffle Ingestion Mode
           </label>
@@ -229,7 +229,7 @@ function SettingsPanel({ onToast }) {
         </div>
       </div>
       <div className="flex flex-col justify-between gap-3 rounded-xl bg-[#6cf8bb]/30 p-3 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#131b2e]">
+        <div className="flex items-center gap-2 text-xs font-semibold text-[#25170f]">
           <BadgeCheck className="size-5 text-[#006c49]" />
           Sync to 12 Gate Mobile Scanners
         </div>
@@ -288,7 +288,7 @@ export function OperationDialog({ type, onOpenChange, onToast }) {
   return (
     <Dialog open={Boolean(type)} onOpenChange={(open) => !open && onOpenChange(null)}>
       <DialogContent className="max-w-2xl p-0">
-        <div className="bg-[#f2f3ff] p-6 pr-14">
+        <div className="bg-[#fff4ee] p-6 pr-14">
           <DialogHeading icon={Icon} title={details.title} description={details.description} />
         </div>
         <div className="p-6 sm:p-8">

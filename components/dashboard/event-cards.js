@@ -1,9 +1,10 @@
 import {
-  Award,
   MapPin,
-  QrCode,
-  Edit,
-  Vote,
+  Dice5,
+  Trophy,
+  Pencil,
+  UsersRound,
+  ExternalLink,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +20,9 @@ export const liveEvents = [
     checkedIn: "1,864 / 2,287 Checked In (81.5%)",
     progress: 81.5,
     actions: [
-      { label: "Raffle", icon: Award, action: "raffle", variant: "amber" },
-      { label: "Voting", icon: Vote, action: "voting", variant: "secondary" },
-      { label: "Edit Forms", icon: Edit, action: "settings", variant: "" },
+      { label: "Raffle", icon: Dice5, action: "raffle", variant: "amber" },
+      { label: "Voting", icon: Trophy, action: "voting", variant: "secondary" },
+      { label: "Edit Forms", icon: Pencil, action: "settings", variant: "" },
     ],
   },
   {
@@ -32,9 +33,9 @@ export const liveEvents = [
     checkedIn: "148 / 180 Checked In (82.2%)",
     progress: 82.2,
     actions: [
-      { label: "Raffle", icon: Award, action: "raffle", variant: "amber" },
-      { label: "Voting", icon: Vote, action: "voting", variant: "secondary" },
-      { label: "Edit Forms", icon: Edit, action: "settings", variant: "" },
+      { label: "Raffle", icon: Dice5, action: "raffle", variant: "amber" },
+      { label: "Voting", icon: Trophy, action: "voting", variant: "secondary" },
+      { label: "Edit Forms", icon: Pencil, action: "settings", variant: "" },
     ],
   },
 ];
@@ -83,17 +84,17 @@ export const upcomingEvents = [
   },
 ];
 
-function ProgressBar({ value, live = false }) {
+function ProgressBar({ value }) {
   return (
     <div
-      className="h-2 w-full overflow-hidden rounded-full bg-[#e2e7ff]"
+      className="h-1.5 w-full overflow-hidden rounded-full bg-[#fff4ee]"
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={value}
     >
       <div
-        className={`h-full rounded-full transition-all duration-700 ${live ? "bg-[#006c49]" : "bg-[#3525cd]"}`}
+        className="h-full rounded-full bg-[#f6671e] transition-all duration-700"
         style={{ width: `${value}%` }}
       />
     </div>
@@ -102,94 +103,123 @@ function ProgressBar({ value, live = false }) {
 
 export function LiveEventCard({ event, onAction }) {
   return (
-    <Card className="flex flex-col gap-6 p-4 sm:p-6 xl:flex-row xl:justify-between">
-      <div className="max-w-2xl flex-1 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="success">
-            <span className="size-2 animate-pulse rounded-full bg-[#006c49]" />
-            Live
-          </Badge>
-          <span className="font-mono text-[11px] leading-4 text-[#777587]">ID: {event.id}</span>
-        </div>
+    <Card className="rounded-xl border border-[#ffdece]/45 p-4 shadow-[0_2px_8px_rgba(101,66,45,0.05)] hover:shadow-[0_8px_22px_rgba(101,66,45,0.09)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#ffdece] px-2 py-0.5 text-[10px] leading-4 font-semibold text-[#f6671e]">
+              <span className="size-1.5 animate-pulse rounded-full bg-[#f6671e]" />
+              Live
+            </span>
+            <span className="font-mono text-[9px] leading-4 text-[#b5a69e]" title={event.id}>ID: {event.displayId || event.id}</span>
+          </div>
 
-        <div>
-          <h3 className="text-xl leading-7 font-bold text-[#131b2e] sm:text-2xl sm:leading-8">
+          <h3 className="truncate text-base leading-5 font-bold text-[#25170f] sm:text-lg sm:leading-6">
             {event.title}
           </h3>
-          <p className="mt-1 flex items-start gap-2 text-sm leading-5 text-[#464555]">
-            <MapPin className="mt-0.5 size-4.5 shrink-0 text-[#777587]" />
-            <span>{event.location}</span>
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-[#96877f]">
+            {event.location}
           </p>
         </div>
 
-        <div className="space-y-1.5 rounded-xl bg-[#f2f3ff] p-3">
-          <div className="flex flex-col justify-between gap-1 text-xs leading-4 sm:flex-row sm:items-center">
-            <span className="text-[#464555]">{event.progressLabel}</span>
-            <span className="font-bold text-[#006c49] sm:text-sm">{event.checkedIn}</span>
-          </div>
-          <ProgressBar value={event.progress} live />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            className="flex size-8 items-center justify-center rounded-lg text-[#25170f] transition-colors hover:bg-[#ffdece] hover:text-[#f6671e] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none"
+            onClick={() => onAction("raffle")}
+            aria-label="Open raffle"
+            title="Raffle"
+          >
+            <Dice5 className="size-4" />
+          </button>
+          <button
+            type="button"
+            className="flex size-8 items-center justify-center rounded-lg text-[#25170f] transition-colors hover:bg-[#ffdece] hover:text-[#f6671e] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none"
+            onClick={() => onAction("voting")}
+            aria-label="Open voting"
+            title="Voting"
+          >
+            <Trophy className="size-4" />
+          </button>
+          {event.sourceId && (
+            <a
+              href={`/events/${event.sourceId}/attendees`}
+              className="flex size-8 items-center justify-center rounded-lg text-[#25170f] transition-colors hover:bg-[#ffdece] hover:text-[#f6671e] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none"
+              aria-label="View attendees"
+              title="View attendees"
+            >
+              <UsersRound className="size-4" />
+            </a>
+          )}
+          <a
+            href={`/register/${event.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex size-8 items-center justify-center rounded-lg text-[#25170f] transition-colors hover:bg-[#ffdece] hover:text-[#f6671e] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none"
+            aria-label="Open registration form"
+            title="Open registration form"
+          >
+            <ExternalLink className="size-4" />
+          </a>
         </div>
       </div>
 
-      <div className="flex self-stretch flex-col items-center justify-center gap-3 border-t border-[#e2e7ff] pt-4 xl:min-w-80 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-6">
-        <div className="grid w-full grid-cols-1 gap-2">
-          {event.actions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Button
-                key={action.label}
-                type="button"
-                size="sm"
-                variant={action.variant}
-                className="h-10 px-3.5 text-xs"
-                onClick={() => onAction(action.action)}
-              >
-                <Icon className="size-4.5" />
-                {action.label}
-              </Button>
-            );
-          })}
+      <div className="mt-3 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] leading-4 sm:text-[11px]">
+          <span className="text-[#96877f]">{event.progressLabel}</span>
+          <span className="font-semibold text-[#f6671e]">{event.checkedIn}</span>
         </div>
-
-
+        <ProgressBar value={event.progress} />
       </div>
     </Card>
   );
 }
 
-export function UpcomingEventCard({ event, onAction }) {
+export function UpcomingEventCard({ event, onEdit }) {
   return (
     <Card className="flex min-h-60 flex-col justify-between space-y-4 p-4 sm:p-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge variant={event.featured ? "default" : "neutral"}>{event.date}</Badge>
-          <span className="text-[11px] leading-4 text-[#777587]">{event.id}</span>
+          <span className="font-mono text-[11px] leading-4 text-[#96877f]" title={event.id}>{event.displayId || event.id}</span>
         </div>
-        <h3 className="text-lg leading-6 font-bold text-[#131b2e] sm:text-xl sm:leading-7">
+        <h3 className="text-lg leading-6 font-bold text-[#25170f] sm:text-xl sm:leading-7">
           {event.title}
         </h3>
-        <p className="flex items-center gap-1 text-xs leading-4 text-[#464555]">
+        <p className="flex items-center gap-1 text-xs leading-4 text-[#6f625b]">
           <MapPin className="size-4 shrink-0" />
           <span>{event.location}</span>
         </p>
         <div className="space-y-1 pt-2">
           <div className="flex flex-col justify-between gap-1 text-[11px] leading-4 min-[420px]:flex-row">
-            <span className="text-[#464555]">Registered Attendees</span>
-            <span className="font-semibold text-[#131b2e]">{event.registration}</span>
+            <span className="text-[#6f625b]">Registered Attendees</span>
+            <span className="font-semibold text-[#25170f]">{event.registration}</span>
           </div>
           <ProgressBar value={event.progress} />
         </div>
       </div>
 
-      <div className="flex flex-col justify-between gap-2 border-t border-[#e2e7ff]/60 pt-3 min-[420px]:flex-row min-[420px]:items-center">
+      <div className="flex flex-col justify-between gap-2 border-t border-[#ffdece]/60 pt-3 min-[420px]:flex-row min-[420px]:items-center">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button type="button" variant="secondary" size="sm" onClick={() => onAction("pass")}>
-            <QrCode className="size-4 text-[#3525cd]" />
-            Reg QR
-          </Button>
+          {event.sourceId && (
+            <Button asChild variant="secondary" size="sm">
+              <a href={`/register/${event.id}`} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-4 text-[#f6671e]" />
+                Registration Form
+              </a>
+            </Button>
+          )}
+          {event.sourceId && (
+            <Button asChild variant="secondary" size="sm">
+              <a href={`/events/${event.sourceId}/attendees`}>
+                <UsersRound className="size-4 text-[#f6671e]" />
+                Attendees
+              </a>
+            </Button>
+          )}
         </div>
-        <Button type="button" size="sm" onClick={() => onAction("settings")}>
-          Edit Forms
+        <Button type="button" size="sm" onClick={onEdit}>
+          Edit Event
         </Button>
       </div>
     </Card>

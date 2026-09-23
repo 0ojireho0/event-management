@@ -4,31 +4,54 @@ import useSWR from "swr";
 
 import api from "@/lib/api";
 
-export async function getAuthenticatedUser() {
-  const { data } = await api.get("/api/user");
+async function getAuthenticatedUser() {
+  try {
+    const { data } = await api.get("/api/user");
 
-  return data;
+    return data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
-export async function login(credentials) {
-  await api.get("/sanctum/csrf-cookie");
-  await api.post("/api/login", credentials);
-
-  return getAuthenticatedUser();
-}
-
-export async function logout() {
-  await api.post("/api/logout");
-}
-
-export function useAuthenticatedUser() {
-  return useSWR("authenticated-user", getAuthenticatedUser, {
+export function useAuth() {
+  const {
+    data: user,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR("/api/user", getAuthenticatedUser, {
     refreshInterval: (currentUser) => (currentUser ? 5000 : 0),
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     refreshWhenHidden: false,
     shouldRetryOnError: false,
   });
+
+  const csrf = () => api.get("/sanctum/csrf-cookie");
+
+  const login = async (credentials) => {
+    await csrf();
+    await api.post("/api/login", credentials);
+    await mutate();
+  };
+
+  const logout = async () => {
+    await api.post("/api/logout");
+    await mutate(null, { revalidate: false });
+  };
+
+  return {
+    user,
+    error,
+    isLoading,
+    login,
+    logout,
+  };
 }
 
 export function getApiErrorMessage(error, fallbackMessage) {

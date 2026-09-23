@@ -20,7 +20,7 @@ function DropdownMenuContent({ className, sideOffset = 8, ...props }) {
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-48 overflow-hidden rounded-xl border border-[#e2e7ff] bg-white p-1.5 text-[#131b2e] shadow-[0_12px_36px_rgba(40,48,68,0.16)] outline-none",
+          "z-50 min-w-48 overflow-hidden rounded-xl border border-[#ffdece] bg-white p-1.5 text-[#25170f] shadow-[0_12px_36px_rgba(40,48,68,0.16)] outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className,
         )}
@@ -36,7 +36,7 @@ function DropdownMenuItem({ className, ...props }) {
       data-slot="dropdown-menu-item"
       className={cn(
         "flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-colors select-none",
-        "focus:bg-[#f2f3ff] focus:text-[#3525cd] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "focus:bg-[#fff4ee] focus:text-[#f6671e] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
@@ -49,7 +49,7 @@ function DropdownMenuSeparator({ className, ...props }) {
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-[#e2e7ff]", className)}
+      className={cn("-mx-1 my-1 h-px bg-[#ffdece]", className)}
       {...props}
     />
   );

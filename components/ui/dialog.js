@@ -49,7 +49,7 @@ function DialogContent({ className, children, showCloseButton = true, ...props }
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-lg bg-[#e2e7ff] text-[#131b2e] transition-colors hover:bg-[#dae2fd] focus-visible:ring-2 focus-visible:ring-[#3525cd]/30 focus-visible:outline-none">
+          <DialogPrimitive.Close className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-lg bg-[#ffdece] text-[#25170f] transition-colors hover:bg-[#f3c7b2] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none">
             <X className="size-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
@@ -77,7 +77,7 @@ function DialogTitle({ className, ...props }) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-xl leading-7 font-bold text-[#131b2e]", className)}
+      className={cn("text-xl leading-7 font-bold text-[#25170f]", className)}
       {...props}
     />
   );
@@ -87,7 +87,7 @@ function DialogDescription({ className, ...props }) {
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-xs leading-4 text-[#464555]", className)}
+      className={cn("text-xs leading-4 text-[#6f625b]", className)}
       {...props}
     />
   );
