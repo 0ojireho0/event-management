@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CalendarCheck2,
   Clock3,
+  LoaderCircle,
   PlusCircle,
   RadioTower,
   Search,
   UsersRound,
 } from "lucide-react";
+import Swal from "sweetalert2";
 
 import LoginScreen from "@/components/auth/login-screen";
 import { CreateEventDialog, OperationDialog } from "@/components/dashboard/event-dialogs";
@@ -24,13 +26,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  getApiErrorMessage,
+  login,
+  logout,
+  useAuthenticatedUser,
+} from "@/functions/auth";
+import { filterEvents } from "@/functions/events";
 import { cn } from "@/lib/utils";
 
 const stats = [
   {
-    label: "Total Portfolio",
+    label: "Total Events",
     value: "14",
-    detail: "Annual scheduled cycles",
+    // detail: "Annual scheduled cycles",
     icon: CalendarCheck2,
     iconClass: "bg-[#e2dfff] text-[#3525cd]",
   },
@@ -48,14 +57,6 @@ const stats = [
     detail: "Registration open",
     icon: Clock3,
     iconClass: "bg-[#e2e7ff] text-[#3525cd]",
-  },
-  {
-    label: "Total Registered",
-    value: "3,412",
-    detail: "81.5% avg live quorum",
-    icon: UsersRound,
-    iconClass: "bg-[#4f46e5]/10 text-[#3525cd]",
-    detailAccent: true,
   },
 ];
 
@@ -93,16 +94,7 @@ function StatCard({ stat }) {
   );
 }
 
-function categoryMatches(event, category) {
-  if (category === "all") return true;
-  const eventCategory = (event.category || "").toLowerCase();
-  if (category === "corporate") {
-    return eventCategory.includes("corporate") || event.id.includes("FIN");
-  }
-  return eventCategory.includes(category);
-}
-
-function EventDashboard({ onLogout }) {
+function EventDashboard({ onLogout, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeRole, setActiveRole] = useState("Admin");
   const [activeTab, setActiveTab] = useState("ongoing");
@@ -111,6 +103,7 @@ function EventDashboard({ onLogout }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [operationType, setOperationType] = useState(null);
   const [toast, setToast] = useState(null);
+  const [createdEvents, setCreatedEvents] = useState([]);
 
   useEffect(() => {
     if (!toast) return;
@@ -118,30 +111,25 @@ function EventDashboard({ onLogout }) {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const normalizedSearch = searchQuery.trim().toLowerCase();
   const visibleLiveEvents = useMemo(
-    () =>
-      liveEvents.filter(
-        (event) =>
-          categoryMatches(event, category) &&
-          (!normalizedSearch ||
-            `${event.title} ${event.location} ${event.id}`.toLowerCase().includes(normalizedSearch)),
-      ),
-    [category, normalizedSearch],
+    () => filterEvents(liveEvents, category, searchQuery),
+    [category, searchQuery],
   );
   const visibleUpcomingEvents = useMemo(
-    () =>
-      upcomingEvents.filter(
-        (event) =>
-          categoryMatches(event, category) &&
-          (!normalizedSearch ||
-            `${event.title} ${event.location} ${event.id}`.toLowerCase().includes(normalizedSearch)),
-      ),
-    [category, normalizedSearch],
+    () => filterEvents([...createdEvents, ...upcomingEvents], category, searchQuery),
+    [category, createdEvents, searchQuery],
   );
 
   function showToast(title, description) {
     setToast({ title, description });
+  }
+
+  function handleEventCreated(event) {
+    setCreatedEvents((current) => [event, ...current]);
+    showToast(
+      "Event Created Successfully",
+      `${event.title} is published with a custom registration form.`,
+    );
   }
 
   return (
@@ -152,6 +140,7 @@ function EventDashboard({ onLogout }) {
         onRoleChange={setActiveRole}
         onMenuOpen={() => setSidebarOpen(true)}
         onLogout={onLogout}
+        user={user}
       />
 
       <div className="xl:pl-72">
@@ -161,14 +150,14 @@ function EventDashboard({ onLogout }) {
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-[28px] leading-9 font-bold tracking-tight text-[#131b2e] sm:text-4xl sm:leading-11">
-                    Event Operations
+                    Dashboard
                   </h1>
                   <Badge variant="success">
                     <span className="size-2 animate-pulse rounded-full bg-[#006c49]" />2 Active Now
                   </Badge>
                 </div>
                 <p className="max-w-2xl text-sm leading-5 text-[#464555]">
-                  Manage corporate galas, technical summits, attendee passes, and live stage tools.
+                  Manage events, registrations, attendee passes, and event activities.
                 </p>
               </div>
               <Button
@@ -178,11 +167,11 @@ function EventDashboard({ onLogout }) {
                 onClick={() => setCreateOpen(true)}
               >
                 <PlusCircle className="size-5" />
-                Create New Event
+                Create Event
               </Button>
             </section>
 
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Event portfolio summary">
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Event portfolio summary">
               {stats.map((stat) => (
                 <StatCard key={stat.label} stat={stat} />
               ))}
@@ -201,7 +190,7 @@ function EventDashboard({ onLogout }) {
                   )}
                 >
                   <span className="size-2 animate-pulse rounded-full bg-[#006c49]" />
-                  <span>Ongoing Live Events (2)</span>
+                  <span>Ongoing Events (2)</span>
                 </button>
                 <button
                   type="button"
@@ -213,10 +202,7 @@ function EventDashboard({ onLogout }) {
                       : "font-medium text-[#464555] hover:text-[#131b2e]",
                   )}
                 >
-                  <span>Upcoming Events (4)</span>
-                  <span className="hidden rounded-full bg-[#e2e7ff] px-1.5 py-0.5 text-[10px] text-[#464555] sm:inline">
-                    Next: Tomorrow
-                  </span>
+                  <span>Upcoming Events ({upcomingEvents.length + createdEvents.length})</span>
                 </button>
               </div>
 
@@ -231,30 +217,11 @@ function EventDashboard({ onLogout }) {
                     aria-label="Filter events"
                   />
                 </div>
-                <select
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                  className="h-9 rounded-xl border-0 bg-[#f2f3ff] px-3 text-xs text-[#131b2e] outline-none focus:ring-2 focus:ring-[#3525cd]/25"
-                  aria-label="Filter by category"
-                >
-                  <option value="all">All Categories</option>
-                  <option value="corporate">Corporate Gala</option>
-                  <option value="tech">Tech Summit</option>
-                  <option value="social">Social & Awards</option>
-                </select>
               </div>
             </section>
 
             {activeTab === "ongoing" && (
               <section className="space-y-4" aria-labelledby="live-events-heading">
-                <div className="flex items-end justify-between gap-4">
-                  <h2 id="live-events-heading" className="text-xl leading-7 font-semibold text-[#131b2e]">
-                    Live Now (Active Gates & Stages)
-                  </h2>
-                  <span className="hidden text-[11px] leading-4 text-[#464555] md:inline">
-                    Real-time gate telemetry & live stage controls
-                  </span>
-                </div>
                 {visibleLiveEvents.length > 0 ? (
                   visibleLiveEvents.map((event) => (
                     <LiveEventCard
@@ -270,30 +237,29 @@ function EventDashboard({ onLogout }) {
               </section>
             )}
 
-            <section className="space-y-4" aria-labelledby="upcoming-events-heading">
-              <div className="flex items-end justify-between gap-4">
-                <h2 id="upcoming-events-heading" className="text-xl leading-7 font-semibold text-[#131b2e]">
-                  Upcoming Scheduled Events
-                </h2>
-                <span className="hidden text-[11px] leading-4 text-[#464555] md:inline">
-                  4 Scheduled • Registration open
-                </span>
-              </div>
-              {visibleUpcomingEvents.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  {visibleUpcomingEvents.map((event) => (
-                    <UpcomingEventCard
-                      key={event.id}
-                      event={event}
-                      onAction={setOperationType}
-                      onToast={showToast}
-                    />
-                  ))}
+            {activeTab === 'upcoming' && (
+              <section className="space-y-4" aria-labelledby="upcoming-events-heading">
+                <div className="flex items-end justify-between gap-4">
+                  <h2 id="upcoming-events-heading" className="text-xl leading-7 font-semibold text-[#131b2e]">
+                    Upcoming Scheduled Events
+                  </h2>
                 </div>
-              ) : (
-                <EmptyState />
-              )}
-            </section>
+                {visibleUpcomingEvents.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {visibleUpcomingEvents.map((event) => (
+                      <UpcomingEventCard
+                        key={event.id}
+                        event={event}
+                        onAction={setOperationType}
+                        onToast={showToast}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState />
+                )}
+              </section>
+            )}
           </div>
         </main>
       </div>
@@ -301,9 +267,7 @@ function EventDashboard({ onLogout }) {
       <CreateEventDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={() =>
-          showToast("Event Created Successfully", "New event is staged and registration QR link generated.")
-        }
+        onCreated={handleEventCreated}
       />
       <OperationDialog type={operationType} onOpenChange={setOperationType} onToast={showToast} />
 
@@ -346,11 +310,44 @@ function EmptyState() {
 }
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const {
+    data: user,
+    error,
+    isLoading,
+    mutate,
+  } = useAuthenticatedUser();
 
-  if (!isLoggedIn) {
-    return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+  async function handleLogin(credentials) {
+    const authenticatedUser = await login(credentials);
+
+    await mutate(authenticatedUser, { revalidate: false });
   }
 
-  return <EventDashboard onLogout={() => setIsLoggedIn(false)} />;
+  async function handleLogout() {
+    try {
+      await logout();
+      await mutate(null, { revalidate: false });
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Sign-out failed",
+        text: getApiErrorMessage(error, "Please try again."),
+        confirmButtonColor: "#4f46e5",
+      });
+    }
+  }
+
+  if (isLoading && !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#faf8ff] text-[#3525cd]">
+        <LoaderCircle className="size-8 animate-spin" aria-label="Checking authentication" />
+      </main>
+    );
+  }
+
+  if (!user || error?.response?.status === 401) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  return <EventDashboard onLogout={handleLogout} user={user} />;
 }

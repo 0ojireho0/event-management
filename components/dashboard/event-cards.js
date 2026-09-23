@@ -1,12 +1,8 @@
 import {
   Award,
-  BadgeCheck,
-  ChevronRight,
-  Download,
-  Mail,
   MapPin,
   QrCode,
-  ScanQrCode,
+  Edit,
   Vote,
 } from "lucide-react";
 
@@ -18,44 +14,28 @@ export const liveEvents = [
   {
     id: "EVT-GALA-2026-HQ",
     title: "Annual Corporate Gala 2026",
-    category: "Corporate Gala",
     location: "Grand Pavilion Hall A & B • 5:00 PM – 11:30 PM (Peak Surge Now)",
-    progressLabel: "Live Attendance Throughput",
+    progressLabel: "Live Attendance",
     checkedIn: "1,864 / 2,287 Checked In (81.5%)",
     progress: 81.5,
-    gateDetail: "Gate 01: 940 • Gate 02: 924",
-    pending: "423",
-    pendingLabel: "guests",
-    controlTitle: "Direct Stage Operations",
-    controlDescription: "Instant launch field & stage overlays",
     actions: [
-      { label: "Open Scanner", icon: ScanQrCode, action: "scanner", variant: "default" },
-      { label: "Stage Raffle", icon: Award, action: "raffle", variant: "amber" },
-      { label: "Voting Control", icon: Vote, action: "voting", variant: "secondary" },
-      { label: "Pass QR", icon: QrCode, action: "pass", variant: "secondary" },
+      { label: "Raffle", icon: Award, action: "raffle", variant: "amber" },
+      { label: "Voting", icon: Vote, action: "voting", variant: "secondary" },
+      { label: "Edit Forms", icon: Edit, action: "settings", variant: "" },
     ],
-    footerAction: "Event Settings & Rules",
-    footerType: "settings",
   },
   {
     id: "EVT-EXEC-2026-VIP",
     title: "Executive Leadership Reception",
-    category: "VIP Networking",
     location: "Skyline Lounge, 48th Floor • 6:30 PM – 10:00 PM",
-    progressLabel: "VIP Check-In Progress",
+    progressLabel: "Live Attendance",
     checkedIn: "148 / 180 Checked In (82.2%)",
     progress: 82.2,
-    gateDetail: "VIP Fast Gate: Handheld 04",
-    pending: "32",
-    pendingLabel: "VIPs",
-    controlTitle: "VIP Controls",
-    controlDescription: "Concierge & Badge verification",
     actions: [
-      { label: "VIP Scanner", icon: ScanQrCode, action: "scanner", variant: "default" },
-      { label: "VIP Badges", icon: BadgeCheck, action: "pass", variant: "secondary" },
+      { label: "Raffle", icon: Award, action: "raffle", variant: "amber" },
+      { label: "Voting", icon: Vote, action: "voting", variant: "secondary" },
+      { label: "Edit Forms", icon: Edit, action: "settings", variant: "" },
     ],
-    footerAction: "Download Roster CSV",
-    footerType: "download",
   },
 ];
 
@@ -120,17 +100,14 @@ function ProgressBar({ value, live = false }) {
   );
 }
 
-export function LiveEventCard({ event, onAction, onToast }) {
+export function LiveEventCard({ event, onAction }) {
   return (
     <Card className="flex flex-col gap-6 p-4 sm:p-6 xl:flex-row xl:justify-between">
       <div className="max-w-2xl flex-1 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="success">
             <span className="size-2 animate-pulse rounded-full bg-[#006c49]" />
-            Live Gate Active
-          </Badge>
-          <Badge variant="neutral" className="text-[#131b2e]">
-            {event.category}
+            Live
           </Badge>
           <span className="font-mono text-[11px] leading-4 text-[#777587]">ID: {event.id}</span>
         </div>
@@ -151,25 +128,11 @@ export function LiveEventCard({ event, onAction, onToast }) {
             <span className="font-bold text-[#006c49] sm:text-sm">{event.checkedIn}</span>
           </div>
           <ProgressBar value={event.progress} live />
-          <div className="flex flex-col justify-between gap-1 pt-0.5 text-xs leading-4 text-[#464555] sm:flex-row">
-            <span>{event.gateDetail}</span>
-            <span>
-              Pending Arrival: <strong className="text-amber-700">{event.pending}</strong>{" "}
-              {event.pendingLabel}
-            </span>
-          </div>
         </div>
       </div>
 
-      <div className="flex self-stretch flex-col items-start justify-between gap-3 border-t border-[#e2e7ff] pt-4 xl:min-w-80 xl:items-end xl:border-t-0 xl:border-l xl:pt-0 xl:pl-6">
-        <div className="w-full text-left xl:text-right">
-          <span className="text-[11px] leading-3.5 font-semibold text-[#777587] uppercase">
-            {event.controlTitle}
-          </span>
-          <p className="text-xs leading-4 text-[#464555]">{event.controlDescription}</p>
-        </div>
-
-        <div className="grid w-full grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+      <div className="flex self-stretch flex-col items-center justify-center gap-3 border-t border-[#e2e7ff] pt-4 xl:min-w-80 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-6">
+        <div className="grid w-full grid-cols-1 gap-2">
           {event.actions.map((action) => {
             const Icon = action.icon;
             return (
@@ -188,32 +151,13 @@ export function LiveEventCard({ event, onAction, onToast }) {
           })}
         </div>
 
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="self-end text-xs"
-          onClick={() => {
-            if (event.footerType === "download") {
-              onToast("Report Exported", "VIP attendance list downloaded.");
-            } else {
-              onAction(event.footerType);
-            }
-          }}
-        >
-          {event.footerAction}
-          {event.footerType === "download" ? (
-            <Download className="size-4" />
-          ) : (
-            <ChevronRight className="size-4" />
-          )}
-        </Button>
+
       </div>
     </Card>
   );
 }
 
-export function UpcomingEventCard({ event, onAction, onToast }) {
+export function UpcomingEventCard({ event, onAction }) {
   return (
     <Card className="flex min-h-60 flex-col justify-between space-y-4 p-4 sm:p-6">
       <div className="space-y-2">
@@ -243,18 +187,9 @@ export function UpcomingEventCard({ event, onAction, onToast }) {
             <QrCode className="size-4 text-[#3525cd]" />
             Reg QR
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => onToast("Email Invites Dispatched", event.toast)}
-          >
-            <Mail className="size-4" />
-            Send Passes
-          </Button>
         </div>
         <Button type="button" size="sm" onClick={() => onAction("settings")}>
-          Edit Event
+          Edit Forms
         </Button>
       </div>
     </Card>

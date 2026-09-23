@@ -3,16 +3,17 @@
 import { useState } from "react";
 import {
   ArrowRight,
-  BadgeCheck,
-  CalendarCheck2,
+  LoaderCircle,
+  LockKeyhole,
   Mail,
-  MailCheck,
-  ShieldCheck,
+  User
 } from "lucide-react";
+import Swal from "sweetalert2";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getApiErrorMessage } from "@/functions/auth";
 
 function BrandMark({ compact = false }) {
   return (
@@ -22,11 +23,11 @@ function BrandMark({ compact = false }) {
           compact ? "size-8" : "size-10 rounded-xl"
         }`}
       >
-        <CalendarCheck2 className={compact ? "size-4.5" : "size-5.5"} />
+        <User className={compact ? "size-4.5" : "size-5.5"} />
       </div>
       {compact && (
         <span className="text-xl leading-7 font-bold tracking-tight text-[#131b2e]">
-          NexusEvent<span className="text-[#3525cd]">360</span>
+          EVORA
         </span>
       )}
     </div>
@@ -37,23 +38,36 @@ function LoginHeader() {
   return (
     <header className="z-10 flex w-full items-center justify-between px-4 py-4 sm:px-8">
       <BrandMark compact />
-      <div className="hidden items-center gap-1 text-[#006c49] sm:flex">
-        <ShieldCheck className="size-4" />
-        <span className="text-[11px] leading-3.5 font-semibold tracking-[0.08em] uppercase">
-          SOC2 Type II • 256-Bit SSL
-        </span>
-      </div>
     </header>
   );
 }
 
 function LoginForm({ onLogin }) {
-  const [email, setEmail] = useState("admin@company.com");
+  const [email, setEmail] = useState("test@example.com");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    if (!email.trim()) return;
-    onLogin(email.trim());
+    if (!email.trim() || !password) return;
+
+    setIsSubmitting(true);
+
+    try {
+      await onLogin({ email: email.trim(), password });
+    } catch (error) {
+      await Swal.fire({
+        icon: "error",
+        title: "Sign-in failed",
+        text: getApiErrorMessage(
+          error,
+          "The API could not be reached. Make sure the Laravel server is running.",
+        ),
+        confirmButtonColor: "#4f46e5",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -71,26 +85,49 @@ function LoginForm({ onLogin }) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="email"
-            placeholder="admin@company.com"
+            placeholder="test@example.com"
             className="h-10 rounded-lg bg-[#f2f3ff] pr-4 pl-10 shadow-sm transition-all focus-visible:bg-white focus-visible:ring-[#3525cd]"
             required
           />
         </div>
       </div>
 
-      <div className="flex items-start gap-2 pt-1 text-[#464555]">
-        <MailCheck className="mt-0.5 size-4 shrink-0 text-[#3525cd]" />
-        <span className="select-none text-xs leading-4">
-          We&apos;ll send a secure magic link or OTP to your email inbox.
-        </span>
+      <div>
+        <label htmlFor="password" className="mb-1.5 block text-xs leading-4 font-medium text-[#131b2e]">
+          Password
+        </label>
+        <div className="relative flex items-center">
+          <LockKeyhole className="pointer-events-none absolute left-3.5 size-4.5 text-[#777587]" />
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            className="h-10 rounded-lg bg-[#f2f3ff] pr-4 pl-10 shadow-sm transition-all focus-visible:bg-white focus-visible:ring-[#3525cd]"
+            required
+          />
+        </div>
       </div>
 
       <Button
         type="submit"
+        disabled={isSubmitting}
         className="mt-4 h-12 w-full rounded-lg bg-[#4f46e5] px-6 text-sm shadow-md hover:bg-[#3525cd] hover:shadow-lg active:scale-[0.99]"
       >
-        Continue with Email
-        <ArrowRight className="size-4.5" />
+        {isSubmitting ? (
+          <>
+            <LoaderCircle className="size-4.5 animate-spin" />
+            Signing in...
+          </>
+        ) : (
+          <>
+            Sign in
+            <ArrowRight className="size-4.5" />
+          </>
+        )}
       </Button>
     </form>
   );
@@ -103,21 +140,21 @@ function LoginCard({ onLogin }) {
         <div className="mb-6 flex flex-col items-center text-center">
           <BrandMark />
           <h1 className="mt-2 text-2xl leading-8 font-bold tracking-tight text-[#131b2e]">
-            Continue with Email
+            Welcome back
           </h1>
           <p className="mt-1 text-sm leading-5 text-[#464555]">
-            Enter your enterprise work email to receive an instant access link or code.
+            Sign in with your event management account.
           </p>
         </div>
 
         <LoginForm onLogin={onLogin} />
 
-        <div className="mt-6 flex items-start justify-center gap-1.5 border-t border-[#dae2fd] pt-4 text-[#464555] sm:items-center">
+        {/* <div className="mt-6 flex items-start justify-center gap-1.5 border-t border-[#dae2fd] pt-4 text-[#464555] sm:items-center">
           <BadgeCheck className="mt-0.5 size-4 shrink-0 text-[#006c49] sm:mt-0" />
           <span className="text-center text-[11px] leading-4">
-            Protected by enterprise grade encryption • SOC 2 Type II
+            Created by Jeremiah & Greian
           </span>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   );
@@ -125,19 +162,8 @@ function LoginCard({ onLogin }) {
 
 function LoginFooter() {
   return (
-    <footer className="flex w-full flex-col items-center justify-between gap-2 px-4 py-4 text-[#464555] sm:flex-row sm:px-8">
-      <span className="text-xs leading-4">© 2025 NexusEvent 360 Inc. All rights reserved.</span>
-      <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2" aria-label="Legal">
-        {["Privacy Policy", "Terms of Service", "Help & Support"].map((item) => (
-          <a
-            key={item}
-            className="text-xs leading-4 transition-colors hover:text-[#131b2e]"
-            href="#"
-          >
-            {item}
-          </a>
-        ))}
-      </nav>
+    <footer className="flex w-full flex-col items-center justify-center gap-2 px-4 py-4 text-[#464555] sm:flex-row sm:px-8">
+      <span className="text-xs leading-4">© 2026 EVORA. All rights reserved.</span>
     </footer>
   );
 }

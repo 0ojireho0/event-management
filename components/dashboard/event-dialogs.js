@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   CircleAlert,
   PartyPopper,
-  PlusCircle,
   QrCode,
   ScanQrCode,
   Settings2,
@@ -19,7 +18,6 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -30,6 +28,8 @@ const fieldLabel =
   "mb-1 block text-[11px] leading-4 font-semibold text-[#464555] uppercase";
 const selectClass =
   "h-10 w-full rounded-xl border-0 bg-[#f2f3ff] px-3 text-sm text-[#131b2e] outline-none focus:ring-2 focus:ring-[#3525cd]/25";
+
+export { CreateEventDialog } from "@/components/dashboard/create-event-dialog";
 
 function DialogHeading({ icon: Icon, title, description, tone = "primary" }) {
   return (
@@ -47,100 +47,6 @@ function DialogHeading({ icon: Icon, title, description, tone = "primary" }) {
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
     </div>
-  );
-}
-
-export function CreateEventDialog({ open, onOpenChange, onCreated }) {
-  function handleSubmit(event) {
-    event.preventDefault();
-    onOpenChange(false);
-    onCreated();
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl p-0">
-        <div className="bg-[#f2f3ff] p-6 pr-14">
-          <DialogHeading
-            icon={PlusCircle}
-            title="Create New Event"
-            description="Configure live ticketing, gate check-in, and stage tools"
-          />
-        </div>
-
-        <form className="space-y-4 p-6" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="event-title" className={fieldLabel}>
-              Event Title
-            </label>
-            <Input
-              id="event-title"
-              name="event-title"
-              placeholder="e.g. Annual Winter Showcase 2026"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="event-category" className={fieldLabel}>
-                Category
-              </label>
-              <select id="event-category" className={selectClass} defaultValue="Corporate Gala">
-                <option>Corporate Gala</option>
-                <option>Technical Summit</option>
-                <option>Networking Mixer</option>
-                <option>Awards Ceremony</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="event-capacity" className={fieldLabel}>
-                Expected Quorum Cap
-              </label>
-              <Input id="event-capacity" name="event-capacity" type="number" placeholder="e.g. 500" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="event-date" className={fieldLabel}>
-                Date & Time
-              </label>
-              <Input id="event-date" name="event-date" type="datetime-local" />
-            </div>
-            <div>
-              <label htmlFor="event-venue" className={fieldLabel}>
-                Venue Location
-              </label>
-              <Input id="event-venue" name="event-venue" placeholder="e.g. Grand Ballroom Hall B" />
-            </div>
-          </div>
-
-          <fieldset className="space-y-2 rounded-xl bg-[#f2f3ff] p-3">
-            <legend className="px-1 text-[11px] leading-4 font-semibold text-[#464555] uppercase">
-              Active Tools Enabled
-            </legend>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#131b2e]">
-              {["QR Scanners", "Live Raffle", "Star Voting"].map((tool) => (
-                <label key={tool} className="inline-flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" defaultChecked className="accent-[#3525cd]" />
-                  <span>{tool}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <DialogFooter className="pt-2">
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit">Publish Event</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -230,24 +136,13 @@ function PassPanel({ onToast }) {
   return (
     <div className="flex flex-col items-center space-y-4 text-center">
       <div className="flex w-60 flex-col items-center rounded-2xl bg-[#f2f3ff] p-4 shadow-sm">
-        <span className="text-[11px] leading-4 font-bold tracking-[0.08em] text-[#3525cd] uppercase">
-          Nexus Mobile Pass
-        </span>
         <div className="my-3 flex size-36 items-center justify-center rounded-xl bg-white p-2 shadow-inner">
           <QrCode className="size-28 stroke-[1.5] text-[#131b2e]" />
         </div>
-        <div className="text-sm font-bold text-[#131b2e]">Elena Rostova</div>
-        <div className="text-xs text-[#464555]">NX-88219 • Corp Services</div>
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#6cf8bb] px-2 py-0.5 text-[11px] font-semibold text-[#00714d]">
           <span className="size-1.5 animate-pulse rounded-full bg-[#006c49]" /> Pass Validated
         </span>
       </div>
-      <Button
-        type="button"
-        onClick={() => onToast("Pass Delivered", "SMS and email pass sent to Elena Rostova.")}
-      >
-        Simulate Resend Pass to Wallet
-      </Button>
     </div>
   );
 }
@@ -402,14 +297,6 @@ export function OperationDialog({ type, onOpenChange, onToast }) {
           {type === "voting" && <VotingPanel onToast={onToast} />}
           {type === "raffle" && <RafflePanel onToast={onToast} />}
           {type === "settings" && <SettingsPanel onToast={onToast} />}
-        </div>
-        <div className="flex flex-col justify-between gap-3 bg-[#f2f3ff] p-4 sm:flex-row sm:items-center">
-          <span className="text-[11px] leading-4 text-[#464555]">{details.status}</span>
-          <DialogClose asChild>
-            <Button type="button" size="sm">
-              Dismiss Simulator
-            </Button>
-          </DialogClose>
         </div>
       </DialogContent>
     </Dialog>
