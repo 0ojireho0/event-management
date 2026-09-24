@@ -8,6 +8,8 @@ import {
   Mail,
   User
 } from "lucide-react";
+import Image from "next/image";
+import HypeLogo from "@/assets/hype-logo.png";
 import Swal from "sweetalert2";
 
 import { Button } from "@/components/ui/button";
@@ -19,12 +21,26 @@ function BrandMark({ compact = false }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className={`flex shrink-0 items-center justify-center rounded-lg bg-[#f6671e] text-white shadow-[0_1px_8px_rgba(0,0,0,0.04)] ${
-          compact ? "size-8" : "size-10 rounded-xl"
+        className={`flex shrink-0 items-center justify-center overflow-hidden ${
+          compact ? "size-8" : "size-10 bg-[#f6671e] text-white shadow-[0_1px_8px_rgba(0,0,0,0.04)] rounded-xl p-1.5"
         }`}
       >
-        <User className={compact ? "size-4.5" : "size-5.5"} />
+        {compact ? (
+          <>
+          <Image
+            src={HypeLogo}
+            alt="Hype Event Hub Logo"
+            className="h-full w-full object-contain"
+            priority
+          />
+          </>
+        ) : (
+          <>
+          <User className={compact ? "size-4.5" : "size-5.5"} />
+          </>
+        )}
       </div>
+
       {compact && (
         <span className="text-xl leading-7 font-bold tracking-tight text-[#25170f]">
           Hype Event Hub
