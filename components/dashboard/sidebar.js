@@ -1,32 +1,23 @@
 import {
-  BadgeCheck,
-  BarChart3,
-  CalendarDays,
-  ChevronsUpDown,
-  ClipboardPenLine,
-  Database,
-  IdCard,
   LayoutDashboard,
-  Network,
   PanelLeftClose,
-  PartyPopper,
   ScanQrCode,
-  Settings,
-  Star,
-  Users,
   X,
 } from "lucide-react";
+import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getNavigationForRole } from "@/lib/role-routing.mjs";
 import { cn } from "@/lib/utils";
 
-const navigation = [
-  { label: "Check-In & Scanner", icon: ScanQrCode, live: true },
-  { label: "Dashboard", icon: LayoutDashboard, active: true, badge: "2 Live" },
-];
+const navigationIcons = {
+  Dashboard: LayoutDashboard,
+  "Check In & Scanner": ScanQrCode,
+};
 
-function SidebarContent({ onClose, mobile = false }) {
+function SidebarContent({ role, activeItem, onClose, mobile = false }) {
+  const navigation = getNavigationForRole(role);
+
   return (
     <>
       <div className="flex items-center justify-between p-6">
@@ -62,16 +53,17 @@ function SidebarContent({ onClose, mobile = false }) {
       <div className="flex-1 overflow-y-auto px-4 py-1">
         <nav className="space-y-1" aria-label="Main navigation">
           {navigation.map((item) => {
-            const Icon = item.icon;
+            const Icon = navigationIcons[item.label];
+            const active = item.label === activeItem;
             return (
-              <a
+              <Link
                 key={item.label}
-                href={item.active ? "#events" : `#${item.label.toLowerCase().replaceAll(" ", "-")}`}
-                aria-current={item.active ? "page" : undefined}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
                 onClick={mobile ? onClose : undefined}
                 className={cn(
                   "group flex min-h-10 items-center justify-between rounded-xl px-4 py-2.5 text-sm leading-5 transition-all",
-                  item.active
+                  active
                     ? "border border-[#f6671e]/30 bg-[#ffdece] font-semibold text-[#f6671e] shadow-sm"
                     : "text-[#6f625b] hover:bg-[#fff4ee] hover:text-[#25170f]",
                 )}
@@ -80,21 +72,7 @@ function SidebarContent({ onClose, mobile = false }) {
                   <Icon className="size-5 shrink-0" />
                   <span className="truncate">{item.label}</span>
                 </span>
-                {item.badge && (
-                  <Badge
-                    variant={item.active ? "dark" : "neutral"}
-                    className={cn(
-                      "ml-2",
-                      item.active
-                        ? "bg-[#f6671e] text-white"
-                        : "bg-[#fff4ee] text-[#6f625b]",
-                    )}
-                  >
-                    {item.badge}
-                  </Badge>
-                )}
-                {item.live && <span className="size-2 shrink-0 rounded-full bg-[#6ffbbe]" />}
-              </a>
+              </Link>
             );
           })}
         </nav>
@@ -114,11 +92,11 @@ function SidebarContent({ onClose, mobile = false }) {
   );
 }
 
-export function Sidebar({ mobileOpen, onClose }) {
+export function Sidebar({ role, activeItem, mobileOpen, onClose }) {
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-72 flex-col border-r border-[#ffdece] bg-white text-[#25170f] shadow-[0_1px_8px_rgba(0,0,0,0.04)] xl:flex">
-        <SidebarContent />
+        <SidebarContent role={role} activeItem={activeItem} />
       </aside>
 
       <div
@@ -144,7 +122,7 @@ export function Sidebar({ mobileOpen, onClose }) {
             mobileOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <SidebarContent mobile onClose={onClose} />
+          <SidebarContent role={role} activeItem={activeItem} mobile onClose={onClose} />
         </aside>
       </div>
     </>

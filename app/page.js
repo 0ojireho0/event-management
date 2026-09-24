@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import { useRouter } from "next/navigation";
 
 import LoginScreen from "@/components/auth/login-screen";
 import { CreateEventDialog, OperationDialog } from "@/components/dashboard/event-dialogs";
@@ -27,6 +28,7 @@ import {
   useAuth,
 } from "@/functions/auth";
 import { filterEvents, useEvents } from "@/functions/events";
+import { getRoleHome } from "@/lib/role-routing.mjs";
 import { cn } from "@/lib/utils";
 
 function StatCard({ stat }) {
@@ -122,7 +124,12 @@ function EventDashboard({ onLogout, user }) {
 
   return (
     <div className="min-h-screen bg-[#fffaf7] text-[#25170f]">
-      <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        role={user.role}
+        activeItem="Dashboard"
+        mobileOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <TopHeader
         onMenuOpen={() => setSidebarOpen(true)}
         onLogout={onLogout}
@@ -340,6 +347,7 @@ function EmptyState() {
 }
 
 export default function Home() {
+  const router = useRouter();
   const {
     user,
     error,
@@ -351,8 +359,21 @@ export default function Home() {
   useEffect(() => {
     if (isLoading && !user && !error) return;
 
-    document.title = user ? "Dashboard | Hype Event Hub" : "Login | Hype Event Hub";
+    document.title = !user
+      ? "Login | Hype Event Hub"
+      : user.role === "Admin"
+        ? "Dashboard | Hype Event Hub"
+        : user.role === "Scanner"
+          ? "Check In & Scanner | Hype Event Hub"
+          : "Access unavailable | Hype Event Hub";
   }, [error, isLoading, user]);
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+
+    const home = getRoleHome(user.role);
+    if (home && home !== "/") router.replace(home);
+  }, [isLoading, router, user]);
 
   async function handleLogin(credentials) {
     await login(credentials);
@@ -381,6 +402,26 @@ export default function Home() {
 
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  if (user.role === "Scanner") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#fffaf7] text-[#f6671e]">
+        <LoaderCircle className="size-8 animate-spin" aria-label="Redirecting to your workspace" />
+      </main>
+    );
+  }
+
+  if (user.role !== "Admin") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#fffaf7] p-4 text-[#25170f]">
+        <Card className="w-full max-w-md space-y-4 p-6 text-center">
+          <h1 className="text-xl font-semibold">Access unavailable</h1>
+          <p className="text-sm text-[#6f625b]">This account does not have access to a workspace.</p>
+          <Button type="button" onClick={handleLogout}>Logout</Button>
+        </Card>
+      </main>
+    );
   }
 
   return <EventDashboard onLogout={handleLogout} user={user} />;
