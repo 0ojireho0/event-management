@@ -27,7 +27,7 @@ function ScannerShell({ user, logout }) {
   return (
     <div className="min-h-screen bg-[#fffaf7] text-[#25170f]">
       <Sidebar
-        role="Scanner"
+        role={user.role}
         activeItem="Check In & Scanner"
         mobileOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -48,7 +48,7 @@ function ScannerShell({ user, logout }) {
 
 export default function ScannerPage() {
   return (
-    <RoleGate allowedRole="Scanner">
+    <RoleGate>
       {({ user, logout }) => <ScannerShell user={user} logout={logout} />}
     </RoleGate>
   );

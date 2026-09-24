@@ -122,7 +122,7 @@ function ManageUsersShell({ user, logout }) {
 
 export default function ManageUsersPage() {
   return (
-    <RoleGate allowedRole="Admin">
+    <RoleGate>
       {({ user, logout }) => <ManageUsersShell user={user} logout={logout} />}
     </RoleGate>
   );

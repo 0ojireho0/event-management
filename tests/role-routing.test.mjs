@@ -10,19 +10,20 @@ test("role homes are exact and unknown roles have no protected destination", () 
   assert.equal(getRoleHome(null), null);
 });
 
-test("admin and scanner routes are mutually exclusive", () => {
+test("admins can access scanner tools while scanner accounts stay restricted", () => {
   assert.equal(canAccessRoute("Admin", "/"), true);
   assert.equal(canAccessRoute("Admin", "/manage-users"), true);
-  assert.equal(canAccessRoute("Admin", "/scanner"), false);
+  assert.equal(canAccessRoute("Admin", "/scanner"), true);
   assert.equal(canAccessRoute("Scanner", "/scanner"), true);
   assert.equal(canAccessRoute("Scanner", "/"), false);
   assert.equal(canAccessRoute("Scanner", "/manage-users"), false);
   assert.equal(canAccessRoute("Operator", "/scanner"), false);
 });
 
-test("each supported role receives only its own navigation", () => {
+test("admins receive scanner navigation while scanner accounts remain limited", () => {
   assert.deepEqual(getNavigationForRole("Admin"), [
     { label: "Dashboard", href: "/" },
+    { label: "Check In & Scanner", href: "/scanner" },
   ]);
   assert.deepEqual(getNavigationForRole("Scanner"), [
     { label: "Check In & Scanner", href: "/scanner" },
