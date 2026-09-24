@@ -1,29 +1,32 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 
 import api from "@/lib/api";
+import { runUserRequest } from "@/lib/user-request.mjs";
 
 export function useUsers() {
+  const { mutate: mutateCache } = useSWRConfig();
+  const revalidateUser = () => mutateCache("/api/user");
   const { data, error, isLoading, mutate } = useSWR(
     "/api/users",
-    () => api.get("/api/users").then((response) => response.data.data),
+    () => runUserRequest(() => api.get("/api/users").then((response) => response.data.data), revalidateUser),
   );
 
   const createUser = async (payload) => {
-    const response = await api.post("/api/users", payload);
+    const response = await runUserRequest(() => api.post("/api/users", payload), revalidateUser);
     await mutate();
     return response.data.data;
   };
 
   const updateUser = async (id, payload) => {
-    const response = await api.put(`/api/users/${id}`, payload);
+    const response = await runUserRequest(() => api.put(`/api/users/${id}`, payload), revalidateUser);
     await mutate();
     return response.data.data;
   };
 
   const deleteUser = async (id) => {
-    await api.delete(`/api/users/${id}`);
+    await runUserRequest(() => api.delete(`/api/users/${id}`), revalidateUser);
     await mutate();
   };
 

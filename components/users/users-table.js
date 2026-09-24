@@ -34,10 +34,10 @@ export function UsersTable({ users, onEdit, onDelete }) {
               <td className="px-5 py-4 whitespace-nowrap text-[#6f625b]">{formatCreatedAt(user.created_at)}</td>
               <td className="px-5 py-4">
                 <div className="flex justify-end gap-1">
-                  <Button type="button" variant="ghost" size="icon" aria-label={`Edit ${user.name}`} title={`Edit ${user.name}`} onClick={() => onEdit(user)}>
+                  <Button type="button" variant="ghost" size="icon" aria-label={`Edit ${user.name}`} title={`Edit ${user.name}`} onClick={(event) => onEdit(user, event.currentTarget)}>
                     <Pencil aria-hidden="true" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${user.name}`} title={`Delete ${user.name}`} onClick={() => onDelete(user)} className="text-[#ba1a1a] hover:bg-[#fff0ed] hover:text-[#93000a]">
+                  <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${user.name}`} title={`Delete ${user.name}`} onClick={(event) => onDelete(user, event.currentTarget)} className="text-[#ba1a1a] hover:bg-[#fff0ed] hover:text-[#93000a]">
                     <Trash2 aria-hidden="true" />
                   </Button>
                 </div>

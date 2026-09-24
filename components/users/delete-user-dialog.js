@@ -15,7 +15,7 @@ import {
 import { getApiErrorMessage } from "@/functions/auth";
 import { finishUserMutation } from "@/lib/user-management-state.mjs";
 
-export function DeleteUserDialog({ user, open, onOpenChange, onConfirm }) {
+export function DeleteUserDialog({ user, open, onOpenChange, onCloseAutoFocus, onConfirm }) {
   const [mutation, setMutation] = useState({ open, submitting: false, error: "", user });
 
   function handleOpenChange(nextOpen) {
@@ -41,7 +41,7 @@ export function DeleteUserDialog({ user, open, onOpenChange, onConfirm }) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={!mutation.submitting} className="max-w-md">
+      <DialogContent showCloseButton={!mutation.submitting} className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
         <div className="space-y-5 p-6 sm:p-7">
           <DialogHeader className="pr-8">
             <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-[#fff0ed] text-[#ba1a1a]">

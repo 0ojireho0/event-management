@@ -66,6 +66,10 @@ export function TopHeader({ onMenuOpen, onLogout, user }) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem>
+                <Settings />
+                Settings
+              </DropdownMenuItem>
               {user?.role === "Admin" && (
                 <DropdownMenuItem asChild>
                   <Link href="/manage-users">
@@ -74,10 +78,6 @@ export function TopHeader({ onMenuOpen, onLogout, user }) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem>
-                <Settings />
-                Settings
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={onLogout}

@@ -359,7 +359,13 @@ export default function Home() {
   useEffect(() => {
     if (isLoading && !user && !error) return;
 
-    document.title = user ? "Dashboard | Hype Event Hub" : "Login | Hype Event Hub";
+    document.title = !user
+      ? "Login | Hype Event Hub"
+      : user.role === "Admin"
+        ? "Dashboard | Hype Event Hub"
+        : user.role === "Scanner"
+          ? "Check In & Scanner | Hype Event Hub"
+          : "Access unavailable | Hype Event Hub";
   }, [error, isLoading, user]);
 
   useEffect(() => {

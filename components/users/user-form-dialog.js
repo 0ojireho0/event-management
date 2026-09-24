@@ -18,7 +18,7 @@ import { finishUserMutation } from "@/lib/user-management-state.mjs";
 
 const fieldLabel = "mb-1.5 block text-xs font-semibold text-[#6f625b]";
 
-export function UserFormDialog({ open, onOpenChange, user, onSubmit }) {
+export function UserFormDialog({ open, onOpenChange, onCloseAutoFocus, user, onSubmit }) {
   const editing = Boolean(user);
   const [fields, setFields] = useState({
     name: user?.name || "",
@@ -61,7 +61,7 @@ export function UserFormDialog({ open, onOpenChange, user, onSubmit }) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={!mutation.submitting} className="max-w-lg">
+      <DialogContent showCloseButton={!mutation.submitting} className="max-w-lg" onCloseAutoFocus={onCloseAutoFocus}>
         <form onSubmit={handleSubmit} className="space-y-5 p-6 sm:p-7">
           <DialogHeader className="pr-8">
             <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-[#ffdece] text-[#f6671e]">

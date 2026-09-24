@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { LoaderCircle, Plus, UsersRound } from "lucide-react";
 
 import { RoleGate } from "@/components/auth/role-gate";
@@ -13,6 +13,7 @@ import { UserFormDialog } from "@/components/users/user-form-dialog";
 import { UsersTable } from "@/components/users/users-table";
 import { getApiErrorMessage } from "@/functions/auth";
 import { useUsers } from "@/functions/users";
+import { restoreDialogFocus } from "@/lib/dialog-focus.mjs";
 
 function ManageUsersShell({ user, logout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,6 +21,9 @@ function ManageUsersShell({ user, logout }) {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const addButtonRef = useRef(null);
+  const formOpenerRef = useRef(null);
+  const deleteOpenerRef = useRef(null);
   const { users, error, isLoading, createUser, updateUser, deleteUser } = useUsers();
 
   async function handleLogout() {
@@ -66,7 +70,7 @@ function ManageUsersShell({ user, logout }) {
                 <h1 className="text-[28px] leading-9 font-bold tracking-tight sm:text-4xl sm:leading-11">Manage Users</h1>
                 <p className="text-sm text-[#6f625b]">Create and manage scanner accounts for event check-in.</p>
               </div>
-              <Button type="button" size="lg" className="w-full sm:w-auto" onClick={() => { setSelectedUser(null); setFormOpen(true); }}>
+              <Button ref={addButtonRef} type="button" size="lg" className="w-full sm:w-auto" onClick={(event) => { formOpenerRef.current = event.currentTarget; setSelectedUser(null); setFormOpen(true); }}>
                 <Plus className="size-5" aria-hidden="true" />
                 Add Scanner
               </Button>
@@ -99,7 +103,7 @@ function ManageUsersShell({ user, logout }) {
                   <p className="max-w-sm text-sm text-[#6f625b]">Add a Scanner to give someone access to event check-in.</p>
                 </Card>
               ) : (
-                <UsersTable users={users} onEdit={(account) => { setSelectedUser(account); setFormOpen(true); }} onDelete={(account) => { setSelectedUser(account); setDeleteOpen(true); }} />
+                <UsersTable users={users} onEdit={(account, button) => { formOpenerRef.current = button; setSelectedUser(account); setFormOpen(true); }} onDelete={(account, button) => { deleteOpenerRef.current = button; setSelectedUser(account); setDeleteOpen(true); }} />
               )}
             </section>
           </div>
@@ -107,10 +111,10 @@ function ManageUsersShell({ user, logout }) {
       </div>
 
       {formOpen && (
-        <UserFormDialog open={formOpen} onOpenChange={handleFormOpenChange} user={selectedUser} onSubmit={handleSave} />
+        <UserFormDialog open={formOpen} onOpenChange={handleFormOpenChange} onCloseAutoFocus={(event) => restoreDialogFocus(event, formOpenerRef.current, addButtonRef.current)} user={selectedUser} onSubmit={handleSave} />
       )}
       {deleteOpen && selectedUser && (
-        <DeleteUserDialog user={selectedUser} open={deleteOpen} onOpenChange={handleDeleteOpenChange} onConfirm={handleDelete} />
+        <DeleteUserDialog user={selectedUser} open={deleteOpen} onOpenChange={handleDeleteOpenChange} onCloseAutoFocus={(event) => restoreDialogFocus(event, deleteOpenerRef.current, addButtonRef.current)} onConfirm={handleDelete} />
       )}
     </div>
   );
