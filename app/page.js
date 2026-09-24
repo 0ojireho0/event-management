@@ -124,7 +124,12 @@ function EventDashboard({ onLogout, user }) {
 
   return (
     <div className="min-h-screen bg-[#fffaf7] text-[#25170f]">
-      <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        role={user.role}
+        activeItem="Dashboard"
+        mobileOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <TopHeader
         onMenuOpen={() => setSidebarOpen(true)}
         onLogout={onLogout}

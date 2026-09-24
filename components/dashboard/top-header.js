@@ -1,13 +1,13 @@
 import {
-  Bell,
   ChevronDown,
-  CircleHelp,
   LogOut,
   Menu,
   Network,
   Settings,
   UserRound,
+  Users,
 } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +66,14 @@ export function TopHeader({ onMenuOpen, onLogout, user }) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {user?.role === "Admin" && (
+                <DropdownMenuItem asChild>
+                  <Link href="/manage-users">
+                    <Users />
+                    Manage Users
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem>
                 <Settings />
                 Settings
