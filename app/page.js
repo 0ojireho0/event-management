@@ -358,9 +358,10 @@ export default function Home() {
   }, [error, isLoading, user]);
 
   useEffect(() => {
-    if (!isLoading && user && user.role !== "Admin") {
-      router.replace(getRoleHome(user.role) || "/");
-    }
+    if (isLoading || !user) return;
+
+    const home = getRoleHome(user.role);
+    if (home && home !== "/") router.replace(home);
   }, [isLoading, router, user]);
 
   async function handleLogin(credentials) {
@@ -392,10 +393,22 @@ export default function Home() {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  if (user.role !== "Admin") {
+  if (user.role === "Scanner") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fffaf7] text-[#f6671e]">
         <LoaderCircle className="size-8 animate-spin" aria-label="Redirecting to your workspace" />
+      </main>
+    );
+  }
+
+  if (user.role !== "Admin") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#fffaf7] p-4 text-[#25170f]">
+        <Card className="w-full max-w-md space-y-4 p-6 text-center">
+          <h1 className="text-xl font-semibold">Access unavailable</h1>
+          <p className="text-sm text-[#6f625b]">This account does not have access to a workspace.</p>
+          <Button type="button" onClick={handleLogout}>Logout</Button>
+        </Card>
       </main>
     );
   }
