@@ -47,10 +47,18 @@ const initialDetails = {
 };
 const initialQuestions = [
   {
-    id: "full-name",
+    id: "last-name",
     type: "short",
-    label: "Full name",
-    description: "Enter the name that should appear on the attendee pass.",
+    label: "Last name",
+    description: "Enter the attendee's last name.",
+    required: true,
+    options: [],
+  },
+  {
+    id: "first-name",
+    type: "short",
+    label: "First name",
+    description: "Enter the attendee's first name.",
     required: true,
     options: [],
   },

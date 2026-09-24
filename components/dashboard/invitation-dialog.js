@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Download, ExternalLink, LoaderCircle, Mail, QrCode, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Download, ExternalLink, History, LoaderCircle, Mail, MailOpen, QrCode, Send } from "lucide-react";
 import Image from "next/image";
 import QRCode from "qrcode";
 
@@ -13,18 +13,57 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
+import {
+  buildInvitationPreview,
+  invitationMessageType,
+  isInvitationContextCurrent,
+  isValidInvitationEmail,
+  parseInvitationEmails,
+} from "@/lib/invitations.mjs";
 
-export function InvitationDialog({ event, open, onOpenChange }) {
-  const [email, setEmail] = useState("");
+function formatInvitationDate(value) {
+  if (!value) return "Date unavailable";
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function InvitationDialogContent({ event, mode, open, onOpenChange }) {
+  const [emailInput, setEmailInput] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const [isSending, setIsSending] = useState(false);
+  const [sendingEventId, setSendingEventId] = useState(null);
+  const [invitationLogs, setInvitationLogs] = useState([]);
+  const [loadedLogsFor, setLoadedLogsFor] = useState(null);
+  const [logError, setLogError] = useState("");
   const [message, setMessage] = useState(null);
+  const dialogContextRef = useRef({ eventId: event?.sourceId ?? null, open });
+  const logRequestIdRef = useRef(0);
+  const emails = useMemo(() => parseInvitationEmails(emailInput), [emailInput]);
+  const invalidEmails = useMemo(
+    () => emails.filter((email) => !isValidInvitationEmail(email)),
+    [emails],
+  );
+  const isSending = sendingEventId === event?.sourceId;
+  const canSend = Boolean(event?.sourceId) && emails.length > 0 && emails.length <= 100 && invalidEmails.length === 0 && !isSending;
+  const isLoadingLogs = Boolean(open && event?.sourceId && loadedLogsFor !== event.sourceId);
   const registrationUrl = useMemo(() => {
     if (!event || typeof window === "undefined") return "";
     return `${window.location.origin}/register/${event.id}`;
   }, [event]);
+  const invitationPreview = useMemo(
+    () => buildInvitationPreview(event?.title || "this event", registrationUrl),
+    [event?.title, registrationUrl],
+  );
+
+  useEffect(() => {
+    dialogContextRef.current = { eventId: event?.sourceId ?? null, open };
+  }, [event?.sourceId, open]);
 
   useEffect(() => {
     if (!open || !registrationUrl) return;
@@ -44,20 +83,70 @@ export function InvitationDialog({ event, open, onOpenChange }) {
     };
   }, [open, registrationUrl]);
 
+  const loadInvitationLogs = useCallback(async (eventId) => {
+    const requestId = ++logRequestIdRef.current;
+
+    try {
+      const { data } = await api.get(`/api/events/${eventId}/invitations`);
+
+      if (requestId === logRequestIdRef.current && isInvitationContextCurrent(eventId, dialogContextRef.current)) {
+        setInvitationLogs(data.data);
+        setLogError("");
+        setLoadedLogsFor(eventId);
+      }
+    } catch {
+      if (requestId === logRequestIdRef.current && isInvitationContextCurrent(eventId, dialogContextRef.current)) {
+        setInvitationLogs([]);
+        setLogError("Recent invitation logs could not be loaded.");
+        setLoadedLogsFor(eventId);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !event?.sourceId) return;
+
+    const eventId = event.sourceId;
+    const requestId = ++logRequestIdRef.current;
+
+    api.get(`/api/events/${eventId}/invitations`)
+      .then(({ data }) => {
+        if (requestId === logRequestIdRef.current && isInvitationContextCurrent(eventId, dialogContextRef.current)) {
+          setInvitationLogs(data.data);
+          setLogError("");
+          setLoadedLogsFor(eventId);
+        }
+      })
+      .catch(() => {
+        if (requestId === logRequestIdRef.current && isInvitationContextCurrent(eventId, dialogContextRef.current)) {
+          setInvitationLogs([]);
+          setLogError("Recent invitation logs could not be loaded.");
+          setLoadedLogsFor(eventId);
+        }
+      });
+  }, [event?.sourceId, open]);
+
   async function sendInvitation(submitEvent) {
     submitEvent.preventDefault();
-    if (!email.trim()) return;
+    if (!canSend) return;
 
-    setIsSending(true);
+    const eventId = event.sourceId;
+    setSendingEventId(eventId);
     setMessage(null);
 
     try {
-      const { data } = await api.post(`/api/events/${event.sourceId}/invitations`, {
-        email: email.trim(),
+      const { data } = await api.post(`/api/events/${eventId}/invitations`, {
+        emails,
       });
-      setMessage({ type: "success", text: data.message });
-      setEmail("");
+
+      if (!isInvitationContextCurrent(eventId, dialogContextRef.current)) return;
+
+      setMessage({ type: invitationMessageType(data.failed_count), text: data.message });
+      setEmailInput("");
+      await loadInvitationLogs(eventId);
     } catch (error) {
+      if (!isInvitationContextCurrent(eventId, dialogContextRef.current)) return;
+
       const errors = error.response?.data?.errors;
       setMessage({
         type: "error",
@@ -66,7 +155,7 @@ export function InvitationDialog({ event, open, onOpenChange }) {
           : error.response?.data?.message || "The invitation could not be sent.",
       });
     } finally {
-      setIsSending(false);
+      setSendingEventId((current) => current === eventId ? null : current);
     }
   }
 
@@ -83,13 +172,35 @@ export function InvitationDialog({ event, open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader className={"mt-4 ml-4"}>
-          <DialogTitle>Event published successfully</DialogTitle>
+          <DialogTitle>{mode === "view" ? event?.title : "Event published successfully"}</DialogTitle>
           <DialogDescription>
-            Invite attendees by email or let them scan the registration QR code.
+            {mode === "view"
+              ? "Review the invitation, send it by email, or share the registration QR code."
+              : "Invite attendees by email or let them scan the registration QR code."}
           </DialogDescription>
         </DialogHeader>
+
+        <section className="mt-4 rounded-2xl border border-[#ffdece] bg-[#fffaf7] p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#ffdece] text-[#f6671e]">
+              <MailOpen className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-[#25170f]">Invitation email preview</h3>
+              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#6f625b]">{invitationPreview}</p>
+              <a
+                href={registrationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#f6671e] hover:underline"
+              >
+                <ExternalLink className="size-3.5" /> Open registration link
+              </a>
+            </div>
+          </div>
+        </section>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <section className="rounded-2xl bg-[#fff4ee] p-5">
@@ -98,20 +209,31 @@ export function InvitationDialog({ event, open, onOpenChange }) {
             </div>
             <h3 className="mt-3 font-bold text-[#25170f]">Email an invitation</h3>
             <p className="mt-1 text-xs leading-5 text-[#6f625b]">
-              The email contains the event name and registration link.
+              Paste up to 100 emails separated by commas, spaces, semicolons, or new lines.
             </p>
             <form onSubmit={sendInvitation} className="mt-4 space-y-3">
-              <Input
-                type="email"
-                value={email}
-                onChange={(inputEvent) => setEmail(inputEvent.target.value)}
-                placeholder="attendee@example.com"
+              <textarea
+                value={emailInput}
+                onChange={(inputEvent) => setEmailInput(inputEvent.target.value)}
+                placeholder={"attendee@example.com\nsecond@example.com"}
                 required
-                className="bg-white"
+                rows={6}
+                className="w-full resize-y rounded-xl border-0 bg-white px-3 py-2 text-sm text-[#25170f] outline-none placeholder:text-[#96877f] focus-visible:ring-2 focus-visible:ring-[#f6671e]/25"
               />
-              <Button type="submit" className="w-full" disabled={isSending}>
+              <div className="space-y-1 text-xs">
+                <p className={emails.length > 100 ? "font-medium text-[#93000a]" : "text-[#6f625b]"}>
+                  {emails.length} unique {emails.length === 1 ? "recipient" : "recipients"} detected
+                  {emails.length > 100 ? " — maximum is 100." : "."}
+                </p>
+                {invalidEmails.length > 0 && (
+                  <p className="break-words font-medium text-[#93000a]">
+                    Invalid: {invalidEmails.join(", ")}
+                  </p>
+                )}
+              </div>
+              <Button type="submit" className="w-full" disabled={!canSend}>
                 {isSending ? <LoaderCircle className="animate-spin" /> : <Send />}
-                {isSending ? "Sending..." : "Send Invitation"}
+                {isSending ? "Sending..." : `Send ${emails.length || ""} Invitation${emails.length === 1 ? "" : "s"}`}
               </Button>
             </form>
           </section>
@@ -139,6 +261,43 @@ export function InvitationDialog({ event, open, onOpenChange }) {
           </section>
         </div>
 
+        <section className="mt-4 rounded-2xl border border-[#ffdece] bg-white p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-[#ffdece] text-[#f6671e]">
+              <History className="size-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-[#25170f]">Recent invitation logs</h3>
+              <p className="text-xs text-[#6f625b]">The latest 20 invitations for this event.</p>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-hidden rounded-xl border border-[#f3e5de]">
+            {isLoadingLogs ? (
+              <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-[#6f625b]">
+                <LoaderCircle className="size-4 animate-spin" /> Loading invitation logs...
+              </div>
+            ) : logError ? (
+              <p className="px-4 py-6 text-sm text-[#93000a]">{logError}</p>
+            ) : invitationLogs.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-[#6f625b]">No invitations have been sent for this event.</p>
+            ) : (
+              <div className="divide-y divide-[#f3e5de]">
+                {invitationLogs.map((invitation) => (
+                  <div key={invitation.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[1fr_1.25fr_auto_auto] sm:items-center">
+                    <span className="truncate font-medium text-[#25170f]" title={invitation.event.title}>{invitation.event.title}</span>
+                    <span className="truncate text-[#6f625b]" title={invitation.email}>{invitation.email}</span>
+                    <span className={invitation.status === "sent" ? "w-fit rounded-full bg-[#6cf8bb]/35 px-2.5 py-1 text-xs font-semibold text-[#006c49]" : "w-fit rounded-full bg-[#ffdad6] px-2.5 py-1 text-xs font-semibold text-[#93000a]"}>
+                      {invitation.status === "sent" ? "Sent" : "Failed"}
+                    </span>
+                    <time className="text-xs text-[#6f625b]" dateTime={invitation.created_at}>{formatInvitationDate(invitation.created_at)}</time>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
         {message && (
           <div role="status" className={message.type === "success" ? "mt-4 flex items-center gap-2 rounded-xl bg-[#6cf8bb]/35 px-4 py-3 text-sm font-medium text-[#006c49]" : "mt-4 rounded-xl bg-[#ffdad6] px-4 py-3 text-sm font-medium text-[#93000a]"}>
             {message.type === "success" && <CheckCircle2 className="size-4" />}
@@ -147,5 +306,17 @@ export function InvitationDialog({ event, open, onOpenChange }) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function InvitationDialog({ event, mode = "published", open, onOpenChange }) {
+  return (
+    <InvitationDialogContent
+      key={event?.sourceId ?? "no-event"}
+      event={event}
+      mode={mode}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
   );
 }

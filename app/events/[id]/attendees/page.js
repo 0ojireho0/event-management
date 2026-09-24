@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, LoaderCircle, UsersRound } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, LoaderCircle, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import api from "@/lib/api";
+import { buildAttendeeExportData } from "@/lib/attendee-export.mjs";
 
 async function getAttendeeData(id) {
   const [eventResponse, registrationsResponse] = await Promise.all([
@@ -28,7 +29,33 @@ export default function EventAttendeesPage() {
   const { id } = useParams();
   const { data, error, isLoading, mutate } = useSWR(id ? `/api/events/${id}/attendees` : null, () => getAttendeeData(id));
   const [checkingIn, setCheckingIn] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [actionError, setActionError] = useState("");
+
+  async function exportToExcel() {
+    setIsExporting(true);
+    setActionError("");
+
+    try {
+      const [{ data: response }, { createAttendeeWorkbookSheets }, { default: writeExcelFile }] = await Promise.all([
+        api.get(`/api/events/${id}/registrations/export`),
+        import("@/lib/attendee-workbook.mjs"),
+        import("write-excel-file/browser"),
+      ]);
+      const safeTitle = data.event.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+      await writeExcelFile(
+        createAttendeeWorkbookSheets(
+          buildAttendeeExportData(response.data, data.event.active_registration_form?.fields || []),
+          data.event.timezone,
+        ),
+      ).toFile(`${safeTitle || "event"}-attendees.xlsx`);
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.message || "The Excel export could not be generated.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   async function checkIn(registration) {
     setCheckingIn(registration.id);
@@ -61,7 +88,13 @@ export default function EventAttendeesPage() {
         <Button asChild variant="ghost" size="sm"><Link href="/"><ArrowLeft />Dashboard</Link></Button>
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div><p className="text-xs font-bold tracking-[0.08em] text-[#f6671e] uppercase">Registered attendees</p><h1 className="mt-1 text-3xl font-bold text-[#25170f]">{data.event.title}</h1><p className="mt-1 text-sm text-[#6f625b]">{data.total} total registration{data.total === 1 ? "" : "s"}</p></div>
-          <div className="flex size-12 items-center justify-center rounded-xl bg-[#ffdece] text-[#f6671e]"><UsersRound className="size-6" /></div>
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="secondary" onClick={exportToExcel} disabled={isExporting || data.total === 0}>
+              {isExporting ? <LoaderCircle className="animate-spin" /> : <FileSpreadsheet />}
+              {isExporting ? "Exporting..." : "Export Excel"}
+            </Button>
+            <div className="flex size-12 items-center justify-center rounded-xl bg-[#ffdece] text-[#f6671e]"><UsersRound className="size-6" /></div>
+          </div>
         </div>
 
         {actionError && <div role="alert" className="rounded-xl bg-[#ffdad6] px-4 py-3 text-sm font-medium text-[#93000a]">{actionError}</div>}
@@ -77,7 +110,7 @@ export default function EventAttendeesPage() {
                   {data.registrations.map((registration) => {
                     const checkedIn = registration.check_ins.some((checkIn) => checkIn.result === "accepted");
                     return (
-                      <tr key={registration.id} className="hover:bg-[#fffaf7]"><td className="px-5 py-4"><div className="font-semibold text-[#25170f]">{registration.attendee.full_name}</div><div className="text-xs text-[#96877f]">{registration.attendee.email}</div></td><td className="px-5 py-4 font-mono text-xs text-[#6f625b]">{registration.registration_code}</td><td className="px-5 py-4"><Badge variant="success">{registration.status}</Badge></td><td className="px-5 py-4 text-xs text-[#6f625b]">{new Date(registration.registered_at).toLocaleString()}</td><td className="px-5 py-4"><Badge variant={checkedIn ? "success" : "neutral"}>{checkedIn ? "Checked in" : "Not checked in"}</Badge></td><td className="px-5 py-4 text-right"><Button type="button" size="sm" variant={checkedIn ? "secondary" : "default"} disabled={checkedIn || checkingIn === registration.id} onClick={() => checkIn(registration)}>{checkingIn === registration.id ? "Checking in..." : checkedIn ? "Completed" : "Check in"}</Button></td></tr>
+                      <tr key={registration.id} className="hover:bg-[#fffaf7]"><td className="px-5 py-4"><div className="font-semibold text-[#25170f]">{registration.attendee.first_name} {registration.attendee.last_name}</div><div className="text-xs text-[#96877f]">{registration.attendee.email}</div></td><td className="px-5 py-4 font-mono text-xs text-[#6f625b]">{registration.registration_code}</td><td className="px-5 py-4"><Badge variant="success">{registration.status}</Badge></td><td className="px-5 py-4 text-xs text-[#6f625b]">{new Date(registration.registered_at).toLocaleString()}</td><td className="px-5 py-4"><Badge variant={checkedIn ? "success" : "neutral"}>{checkedIn ? "Checked in" : "Not checked in"}</Badge></td><td className="px-5 py-4 text-right"><Button type="button" size="sm" variant={checkedIn ? "secondary" : "default"} disabled={checkedIn || checkingIn === registration.id} onClick={() => checkIn(registration)}>{checkingIn === registration.id ? "Checking in..." : checkedIn ? "Completed" : "Check in"}</Button></td></tr>
                     );
                   })}
                 </tbody>

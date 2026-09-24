@@ -5,6 +5,7 @@ import {
   Pencil,
   UsersRound,
   ExternalLink,
+  Eye,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +102,7 @@ function ProgressBar({ value }) {
   );
 }
 
-export function LiveEventCard({ event, onAction }) {
+export function LiveEventCard({ event, onAction, onView }) {
   return (
     <Card className="rounded-xl border border-[#ffdece]/45 p-4 shadow-[0_2px_8px_rgba(101,66,45,0.05)] hover:shadow-[0_8px_22px_rgba(101,66,45,0.09)]">
       <div className="flex items-start justify-between gap-3">
@@ -123,6 +124,17 @@ export function LiveEventCard({ event, onAction }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {event.sourceId && (
+            <button
+              type="button"
+              className="flex size-8 items-center justify-center rounded-lg text-[#25170f] transition-colors hover:bg-[#ffdece] hover:text-[#f6671e] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none"
+              onClick={onView}
+              aria-label="View event"
+              title="View event"
+            >
+              <Eye className="size-4" />
+            </button>
+          )}
           <button
             type="button"
             className="flex size-8 items-center justify-center rounded-lg text-[#25170f] transition-colors hover:bg-[#ffdece] hover:text-[#f6671e] focus-visible:ring-2 focus-visible:ring-[#f6671e]/30 focus-visible:outline-none"
@@ -175,7 +187,7 @@ export function LiveEventCard({ event, onAction }) {
   );
 }
 
-export function UpcomingEventCard({ event, onEdit }) {
+export function UpcomingEventCard({ event, onEdit, onView }) {
   return (
     <Card className="flex min-h-60 flex-col justify-between space-y-4 p-4 sm:p-6">
       <div className="space-y-2">
@@ -218,9 +230,21 @@ export function UpcomingEventCard({ event, onEdit }) {
             </Button>
           )}
         </div>
-        <Button type="button" size="sm" onClick={onEdit}>
-          Edit Event
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            onClick={onView}
+            aria-label="View event"
+            title="View event"
+          >
+            <Eye />
+          </Button>
+          <Button type="button" size="sm" onClick={onEdit}>
+            Edit Event
+          </Button>
+        </div>
       </div>
     </Card>
   );

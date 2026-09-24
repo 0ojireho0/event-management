@@ -43,7 +43,7 @@ function LoginHeader() {
 }
 
 function LoginForm({ onLogin }) {
-  const [email, setEmail] = useState("test@example.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 

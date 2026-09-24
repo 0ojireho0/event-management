@@ -71,6 +71,7 @@ function EventDashboard({ onLogout, user }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [invitationEvent, setInvitationEvent] = useState(null);
+  const [invitationMode, setInvitationMode] = useState("published");
   const [operationType, setOperationType] = useState(null);
   const [toast, setToast] = useState(null);
   const { events, error: eventsError, isLoading: eventsLoading, createEvent, updateEvent } = useEvents();
@@ -112,7 +113,10 @@ function EventDashboard({ onLogout, user }) {
     );
 
     if (!wasEditing) {
-      window.setTimeout(() => setInvitationEvent(savedEvent), 0);
+      window.setTimeout(() => {
+        setInvitationMode("published");
+        setInvitationEvent(savedEvent);
+      }, 0);
     }
   }
 
@@ -218,7 +222,15 @@ function EventDashboard({ onLogout, user }) {
                 ) : visibleLiveEvents.length > 0 ? (
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     {visibleLiveEvents.map((event) => (
-                      <LiveEventCard key={event.id} event={event} onAction={setOperationType} />
+                      <LiveEventCard
+                        key={event.id}
+                        event={event}
+                        onAction={setOperationType}
+                        onView={() => {
+                          setInvitationMode("view");
+                          setInvitationEvent(event);
+                        }}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -242,6 +254,10 @@ function EventDashboard({ onLogout, user }) {
                       <UpcomingEventCard
                         key={event.id}
                         event={event}
+                        onView={() => {
+                          setInvitationMode("view");
+                          setInvitationEvent(event);
+                        }}
                         onEdit={() => {
                           setEditingEvent(event);
                           setCreateOpen(true);
@@ -271,6 +287,7 @@ function EventDashboard({ onLogout, user }) {
       <OperationDialog type={operationType} onOpenChange={setOperationType} onToast={showToast} />
       <InvitationDialog
         event={invitationEvent}
+        mode={invitationMode}
         open={Boolean(invitationEvent)}
         onOpenChange={(open) => {
           if (!open) setInvitationEvent(null);

@@ -25,7 +25,8 @@ function toDateTimeLocal(value) {
 }
 
 function systemKeyForQuestion(question) {
-  if (question.id === "full-name") return "full_name";
+  if (question.id === "first-name") return "first_name";
+  if (question.id === "last-name") return "last_name";
   if (question.id === "work-email") return "email";
 
   const normalizedLabel = question.label.trim().toLowerCase();
