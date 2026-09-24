@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import { useRouter } from "next/navigation";
 
 import LoginScreen from "@/components/auth/login-screen";
 import { CreateEventDialog, OperationDialog } from "@/components/dashboard/event-dialogs";
@@ -27,6 +28,7 @@ import {
   useAuth,
 } from "@/functions/auth";
 import { filterEvents, useEvents } from "@/functions/events";
+import { getRoleHome } from "@/lib/role-routing.mjs";
 import { cn } from "@/lib/utils";
 
 function StatCard({ stat }) {
@@ -340,6 +342,7 @@ function EmptyState() {
 }
 
 export default function Home() {
+  const router = useRouter();
   const {
     user,
     error,
@@ -353,6 +356,12 @@ export default function Home() {
 
     document.title = user ? "Dashboard | Hype Event Hub" : "Login | Hype Event Hub";
   }, [error, isLoading, user]);
+
+  useEffect(() => {
+    if (!isLoading && user && user.role !== "Admin") {
+      router.replace(getRoleHome(user.role) || "/");
+    }
+  }, [isLoading, router, user]);
 
   async function handleLogin(credentials) {
     await login(credentials);
@@ -381,6 +390,14 @@ export default function Home() {
 
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  if (user.role !== "Admin") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#fffaf7] text-[#f6671e]">
+        <LoaderCircle className="size-8 animate-spin" aria-label="Redirecting to your workspace" />
+      </main>
+    );
   }
 
   return <EventDashboard onLogout={handleLogout} user={user} />;
