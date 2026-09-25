@@ -125,7 +125,17 @@ function BuilderTabs({ activeView, onChange }) {
   );
 }
 
-function EventDetails({ details, onChange }) {
+function getLocalDateTimeMin() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+
+  return new Date(now.getTime() - offset * 60 * 1000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function EventDetails({ details, onChange  }) {
+  const minDateTime = getLocalDateTimeMin();
   return (
     <section className="space-y-5">
       <div>
@@ -164,12 +174,35 @@ function EventDetails({ details, onChange }) {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="event-start" className={fieldLabel}>Starts at</label>
-          <Input id="event-start" type="datetime-local" value={details.startsAt} onChange={(event) => onChange("startsAt", event.target.value)} />
+          <label htmlFor="event-start" className={fieldLabel}>
+            Starts at
+          </label>
+
+          <Input
+            id="event-start"
+            type="datetime-local"
+            value={details.startsAt}
+            min={minDateTime}
+            onChange={(event) =>
+              onChange("startsAt", event.target.value)
+            }
+          />
         </div>
+
         <div>
-          <label htmlFor="event-end" className={fieldLabel}>Ends at</label>
-          <Input id="event-end" type="datetime-local" value={details.endsAt} onChange={(event) => onChange("endsAt", event.target.value)} />
+          <label htmlFor="event-end" className={fieldLabel}>
+            Ends at
+          </label>
+
+          <Input
+            id="event-end"
+            type="datetime-local"
+            value={details.endsAt}
+            min={details.startsAt || (minDateTime)}
+            onChange={(event) =>
+              onChange("endsAt", event.target.value)
+            }
+          />
         </div>
       </div>
       <div>

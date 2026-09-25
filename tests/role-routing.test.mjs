@@ -14,7 +14,9 @@ test("admins can access scanner tools while scanner accounts stay restricted", (
   assert.equal(canAccessRoute("Admin", "/"), true);
   assert.equal(canAccessRoute("Admin", "/manage-users"), true);
   assert.equal(canAccessRoute("Admin", "/scanner"), true);
+  assert.equal(canAccessRoute("Admin", "/settings"), true);
   assert.equal(canAccessRoute("Scanner", "/scanner"), true);
+  assert.equal(canAccessRoute("Scanner", "/settings"), true);
   assert.equal(canAccessRoute("Scanner", "/"), false);
   assert.equal(canAccessRoute("Scanner", "/manage-users"), false);
   assert.equal(canAccessRoute("Operator", "/scanner"), false);
