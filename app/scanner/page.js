@@ -9,6 +9,7 @@ import { RoleGate } from "@/components/auth/role-gate";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopHeader } from "@/components/dashboard/top-header";
 import { CameraScanner } from "@/components/scanner/camera-scanner";
+import { CheckInResultDialog } from "@/components/scanner/check-in-result-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getApiErrorMessage } from "@/functions/auth";
@@ -92,6 +93,15 @@ function ScannerShell({ user, logout }) {
     }
   }
 
+  function scanAnotherQr() {
+    setFeedback(null);
+    setScannedCode("");
+    setManualCode("");
+    setCameraError("");
+    setCameraOpen(true);
+    setCameraKey((key) => key + 1);
+  }
+
   return (
     <div className="min-h-screen bg-[#fffaf7] text-[#25170f]">
       <Sidebar role={user.role} activeItem="Check In & Scanner" mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -156,7 +166,7 @@ function ScannerShell({ user, logout }) {
               <Card className="border border-[#ffdece]">
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2 font-semibold"><ScanLine className="text-[#f6671e]" /> Point the camera at the attendee QR</div>
-                  <CameraScanner key={cameraKey} paused={shouldPauseCamera({ submitting, scannedCode })} onCode={(value) => submitCode(value, "camera")} onError={(failure) => setCameraError(getCameraErrorMessage(failure))} />
+                  <CameraScanner key={cameraKey} paused={shouldPauseCamera({ submitting, scannedCode, modalOpen: Boolean(feedback?.modal) })} onCode={(value) => submitCode(value, "camera")} onError={(failure) => setCameraError(getCameraErrorMessage(failure))} />
                   {cameraError && (
                     <div role="alert" className="space-y-3 rounded-xl bg-[#fff0ee] p-4 text-sm text-[#93000a]">
                       <p>{cameraError}</p>
@@ -170,7 +180,7 @@ function ScannerShell({ user, logout }) {
               </Card>
             )}
 
-            {feedback && (
+            {feedback && !feedback.modal && (
               <div role="status" className={`flex items-start gap-3 rounded-2xl border p-5 ${feedbackStyles[feedback.tone]}`}>
                 {feedback.tone === "success" ? <BadgeCheck className="mt-0.5 size-6 shrink-0" /> : <TriangleAlert className="mt-0.5 size-6 shrink-0" />}
                 <div>
@@ -185,6 +195,7 @@ function ScannerShell({ user, logout }) {
           </div>
         </main>
       </div>
+      <CheckInResultDialog feedback={feedback} onScanAnother={scanAnotherQr} />
     </div>
   );
 }
