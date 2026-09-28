@@ -162,21 +162,23 @@ test("loading snapshots and errors cannot interrupt other busy transitions", () 
 
 test("snapshot tokens reject responses started before or during a mutation", () => {
   const tracker = createRaffleRequestTracker();
-  const before = tracker.snapshotToken();
+  const before = tracker.beginRefresh();
   assert.equal(createRaffleRequestTracker().shouldApplySnapshot(before), false);
   assert.equal(tracker.shouldApplySnapshot(before), true);
-  assert.equal(tracker.canRefresh(), true);
+  assert.equal(tracker.beginRefresh(), null);
   assert.equal(tracker.beginMutation(), true);
-  assert.equal(tracker.canRefresh(), false);
-  const during = tracker.snapshotToken();
+  const during = tracker.beginRefresh();
   assert.equal(tracker.shouldApplySnapshot(before), false);
   assert.equal(tracker.shouldApplySnapshot(during), false);
   assert.equal(tracker.beginMutation(), false);
   tracker.settleMutation();
+  tracker.settleRefresh();
   assert.equal(tracker.shouldApplySnapshot(before), false);
   assert.equal(tracker.shouldApplySnapshot(during), false);
-  assert.equal(tracker.shouldApplySnapshot(tracker.snapshotToken()), true);
-  assert.equal(tracker.canRefresh(), true);
+  const after = tracker.beginRefresh();
+  assert.notEqual(after, null);
+  assert.equal(tracker.shouldApplySnapshot(after), true);
+  tracker.settleRefresh();
 });
 
 test("unmount waits for a draw response then cancels its new reservation once", () => {
@@ -214,13 +216,42 @@ test("successful confirmation or cancellation leaves no reservation to clean up"
 
 test("an effect setup after a development cleanup keeps its reservation and permits requests", () => {
   const tracker = createRaffleRequestTracker();
-  const mountedSnapshot = tracker.snapshotToken();
   tracker.setPendingDraw(draw.id);
   tracker.dispose();
   tracker.resume();
-  assert.equal(tracker.canRefresh(), true);
-  assert.equal(tracker.shouldApplySnapshot(mountedSnapshot), true);
+  const token = tracker.beginRefresh();
+  assert.notEqual(token, null);
+  tracker.settleRefresh();
   assert.equal(tracker.takeCleanupDrawId(), null);
   tracker.dispose();
   assert.equal(tracker.takeCleanupDrawId(), draw.id);
+});
+
+test("a revisited page initializes from unchanged cached raffle data", () => {
+  const payload = { event: { id: 1, slug: "sample", title: "Sample Event" }, eligible_attendees: [alice, bob], eligible_count: 2, pending_draw: null, winners: [] };
+  const previousPage = createRaffleRequestTracker();
+  assert.equal(previousPage.cachedLoadAction(payload).payload, payload);
+  previousPage.beginMutation();
+  previousPage.settleMutation();
+  previousPage.dispose();
+
+  const nextPage = createRaffleRequestTracker();
+  const action = nextPage.cachedLoadAction(payload);
+  assert.equal(action.payload, payload);
+  assert.equal(raffleReducer(createRaffleState(), action).status, "ready");
+});
+
+test("cached raffle data is ignored after a local request and an overlapping refresh becomes stale", () => {
+  const tracker = createRaffleRequestTracker();
+  const payload = { event: { id: 1, slug: "sample", title: "Sample Event" }, eligible_attendees: [alice], eligible_count: 1, pending_draw: null, winners: [] };
+  const refreshToken = tracker.beginRefresh();
+  assert.equal(tracker.cachedLoadAction(payload), null);
+  assert.equal(tracker.beginRefresh(), null);
+  assert.equal(tracker.beginMutation(), true);
+  assert.equal(tracker.shouldApplySnapshot(refreshToken), false);
+  tracker.settleMutation();
+  tracker.settleRefresh();
+  assert.equal(tracker.shouldApplySnapshot(refreshToken), false);
+  assert.equal(tracker.cachedLoadAction(payload), null);
+  assert.notEqual(tracker.beginRefresh(), null);
 });

@@ -34,28 +34,16 @@ function RaffleShell({ user, logout, eventId }) {
   const [state, dispatch] = useReducer(raffleReducer, undefined, createRaffleState);
   const [tracker] = useState(createRaffleRequestTracker);
   const endpoint = `/api/events/${encodeURIComponent(eventId)}/raffle`;
-  const { data: snapshot, isLoading, mutate } = useSWR(
+  const { data, error, mutate } = useSWR(
     endpoint,
-    async (url) => {
-      const token = tracker.snapshotToken();
-      try {
-        const response = await api.get(url);
-        return { token, payload: response.data.data };
-      } catch (error) {
-        return { token, error };
-      }
-    },
+    (url) => api.get(url).then((response) => response.data.data),
     { revalidateOnFocus: false, revalidateOnReconnect: false },
   );
 
   useEffect(() => {
-    if (!snapshot || !tracker.shouldApplySnapshot(snapshot.token)) return;
-    if (snapshot.error) dispatch({ type: "LOAD_FAILURE", error: snapshot.error });
-    else {
-      tracker.setPendingDraw(snapshot.payload.pending_draw?.id);
-      dispatch({ type: "LOAD_SUCCESS", payload: snapshot.payload });
-    }
-  }, [snapshot, tracker]);
+    const action = tracker.cachedLoadAction(data, error);
+    if (action) dispatch(action);
+  }, [data, error, tracker]);
 
   useEffect(() => {
     tracker.resume();
@@ -69,8 +57,21 @@ function RaffleShell({ user, logout, eventId }) {
     };
   }, [endpoint, tracker]);
 
-  function refresh() {
-    if (tracker.canRefresh()) mutate();
+  async function refresh() {
+    const token = tracker.beginRefresh();
+    if (!token) return;
+    try {
+      const response = await api.get(endpoint);
+      if (!tracker.shouldApplySnapshot(token)) return;
+      const payload = response.data.data;
+      tracker.setPendingDraw(payload.pending_draw?.id);
+      dispatch({ type: "LOAD_SUCCESS", payload });
+      mutate(payload, { revalidate: false }).catch(() => {});
+    } catch (requestError) {
+      if (tracker.shouldApplySnapshot(token)) dispatch({ type: "LOAD_FAILURE", error: requestError });
+    } finally {
+      tracker.settleRefresh();
+    }
   }
 
   async function spin() {
@@ -173,7 +174,7 @@ function RaffleShell({ user, logout, eventId }) {
               </div>
             )}
 
-            {isLoading && state.status === "loading" ? (
+            {state.status === "loading" ? (
               <Card className="flex min-h-80 items-center justify-center gap-3 text-[#f6671e]">
                 <LoaderCircle className="size-7 animate-spin" aria-hidden="true" />
                 <span>Loading raffle...</span>
