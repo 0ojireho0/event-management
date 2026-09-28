@@ -5,6 +5,7 @@ import {
   canCancel,
   canConfirm,
   canStartDraw,
+  createRaffleRequestTracker,
   createRaffleState,
   getRaffleErrorMessage,
   getWheelAttendees,
@@ -131,4 +132,95 @@ test("selectors block duplicate or overlapping lifecycle actions", () => {
   assert.equal(canConfirm(settled), true);
   assert.equal(canCancel(settled), true);
   assert.equal(canStartDraw(ready), true);
+});
+
+test("a loading snapshot cannot interrupt confirmation or discard its successful result", () => {
+  const pending = loaded({ eligible_attendees: [bob], eligible_count: 1, pending_draw: { ...draw, ...alice } });
+  const confirming = raffleReducer(pending, { type: "CONFIRM_START" });
+  const stale = raffleReducer(confirming, {
+    type: "LOAD_SUCCESS",
+    payload: { event: pending.event, eligible_attendees: [bob], eligible_count: 1, pending_draw: { ...draw, ...alice }, winners: [] },
+  });
+  assert.equal(stale, confirming);
+  const confirmed = raffleReducer(stale, { type: "CONFIRM_SUCCESS", payload: { draw: { ...draw, status: "confirmed" }, attendee: alice, winner } });
+  assert.equal(confirmed.status, "confirmed");
+  assert.deepEqual(confirmed.winners, [winner]);
+  assert.equal(confirmed.pendingDraw, null);
+});
+
+test("loading snapshots and errors cannot interrupt other busy transitions", () => {
+  const ready = loaded();
+  const drawing = raffleReducer(ready, { type: "DRAW_START" });
+  const spinning = raffleReducer(drawing, { type: "DRAW_SUCCESS", payload: { draw, attendee: alice } });
+  const cancelling = raffleReducer(raffleReducer(spinning, { type: "SPIN_END" }), { type: "CANCEL_START" });
+  const stalePayload = { event: ready.event, eligible_attendees: [alice, bob], eligible_count: 2, pending_draw: null, winners: [] };
+  for (const busy of [drawing, spinning, cancelling]) {
+    assert.equal(raffleReducer(busy, { type: "LOAD_SUCCESS", payload: stalePayload }), busy);
+    assert.equal(raffleReducer(busy, { type: "LOAD_FAILURE", error: new Error("stale request") }), busy);
+  }
+});
+
+test("snapshot tokens reject responses started before or during a mutation", () => {
+  const tracker = createRaffleRequestTracker();
+  const before = tracker.snapshotToken();
+  assert.equal(createRaffleRequestTracker().shouldApplySnapshot(before), false);
+  assert.equal(tracker.shouldApplySnapshot(before), true);
+  assert.equal(tracker.canRefresh(), true);
+  assert.equal(tracker.beginMutation(), true);
+  assert.equal(tracker.canRefresh(), false);
+  const during = tracker.snapshotToken();
+  assert.equal(tracker.shouldApplySnapshot(before), false);
+  assert.equal(tracker.shouldApplySnapshot(during), false);
+  assert.equal(tracker.beginMutation(), false);
+  tracker.settleMutation();
+  assert.equal(tracker.shouldApplySnapshot(before), false);
+  assert.equal(tracker.shouldApplySnapshot(during), false);
+  assert.equal(tracker.shouldApplySnapshot(tracker.snapshotToken()), true);
+  assert.equal(tracker.canRefresh(), true);
+});
+
+test("unmount waits for a draw response then cancels its new reservation once", () => {
+  const tracker = createRaffleRequestTracker();
+  tracker.beginMutation();
+  tracker.dispose();
+  assert.equal(tracker.takeCleanupDrawId(), null);
+  tracker.setPendingDraw(draw.id);
+  tracker.settleMutation();
+  assert.equal(tracker.takeCleanupDrawId(), draw.id);
+  assert.equal(tracker.takeCleanupDrawId(), null);
+});
+
+test("unmount after a failed confirm or cancel releases a known pending reservation", () => {
+  for (const operation of ["confirm", "cancel"]) {
+    const tracker = createRaffleRequestTracker();
+    tracker.setPendingDraw(draw.id);
+    tracker.beginMutation(operation);
+    tracker.dispose();
+    assert.equal(tracker.takeCleanupDrawId(), null);
+    tracker.settleMutation();
+    assert.equal(tracker.takeCleanupDrawId(), draw.id);
+  }
+});
+
+test("successful confirmation or cancellation leaves no reservation to clean up", () => {
+  const tracker = createRaffleRequestTracker();
+  tracker.setPendingDraw(draw.id);
+  tracker.beginMutation();
+  tracker.dispose();
+  tracker.setPendingDraw(null);
+  tracker.settleMutation();
+  assert.equal(tracker.takeCleanupDrawId(), null);
+});
+
+test("an effect setup after a development cleanup keeps its reservation and permits requests", () => {
+  const tracker = createRaffleRequestTracker();
+  const mountedSnapshot = tracker.snapshotToken();
+  tracker.setPendingDraw(draw.id);
+  tracker.dispose();
+  tracker.resume();
+  assert.equal(tracker.canRefresh(), true);
+  assert.equal(tracker.shouldApplySnapshot(mountedSnapshot), true);
+  assert.equal(tracker.takeCleanupDrawId(), null);
+  tracker.dispose();
+  assert.equal(tracker.takeCleanupDrawId(), draw.id);
 });

@@ -3,7 +3,7 @@
 import { ArrowLeft, CircleAlert, Dice5, LoaderCircle, RotateCcw, Trophy, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import useSWR from "swr";
 
 import { RoleGate } from "@/components/auth/role-gate";
@@ -17,6 +17,7 @@ import {
   canCancel,
   canConfirm,
   canStartDraw,
+  createRaffleRequestTracker,
   createRaffleState,
   getRaffleErrorMessage,
   getWheelAttendees,
@@ -31,74 +32,92 @@ function RaffleShell({ user, logout, eventId }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [state, dispatch] = useReducer(raffleReducer, undefined, createRaffleState);
-  const pendingRef = useRef(null);
-  const actionRef = useRef(null);
+  const [tracker] = useState(createRaffleRequestTracker);
   const endpoint = `/api/events/${encodeURIComponent(eventId)}/raffle`;
-  const { data, error, isLoading, mutate } = useSWR(
+  const { data: snapshot, isLoading, mutate } = useSWR(
     endpoint,
-    (url) => api.get(url).then((response) => response.data.data),
+    async (url) => {
+      const token = tracker.snapshotToken();
+      try {
+        const response = await api.get(url);
+        return { token, payload: response.data.data };
+      } catch (error) {
+        return { token, error };
+      }
+    },
     { revalidateOnFocus: false, revalidateOnReconnect: false },
   );
 
   useEffect(() => {
-    if (data) dispatch({ type: "LOAD_SUCCESS", payload: data });
-    else if (error) dispatch({ type: "LOAD_FAILURE", error });
-  }, [data, error]);
+    if (!snapshot || !tracker.shouldApplySnapshot(snapshot.token)) return;
+    if (snapshot.error) dispatch({ type: "LOAD_FAILURE", error: snapshot.error });
+    else {
+      tracker.setPendingDraw(snapshot.payload.pending_draw?.id);
+      dispatch({ type: "LOAD_SUCCESS", payload: snapshot.payload });
+    }
+  }, [snapshot, tracker]);
 
   useEffect(() => {
-    pendingRef.current = state.pendingDraw?.id ?? null;
-  }, [state.pendingDraw]);
+    tracker.resume();
+    return () => {
+      tracker.dispose();
+      // A same-tick effect setup in development can resume before cleanup runs.
+      queueMicrotask(() => {
+        const drawId = tracker.takeCleanupDrawId();
+        if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
+      });
+    };
+  }, [endpoint, tracker]);
 
-  useEffect(() => () => {
-    const drawId = pendingRef.current;
-    if (drawId && !actionRef.current) {
-      // The authenticated request is best effort; the server expires abandoned draws.
-      api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
-    }
-  }, [endpoint]);
+  function refresh() {
+    if (tracker.canRefresh()) mutate();
+  }
 
   async function spin() {
-    if (!canStartDraw(state) || actionRef.current) return;
-    actionRef.current = "draw";
+    if (!canStartDraw(state) || !tracker.beginMutation()) return;
     dispatch({ type: "DRAW_START" });
     try {
       const response = await api.post(`${endpoint}/draws`);
-      pendingRef.current = response.data.data.draw.id;
+      tracker.setPendingDraw(response.data.data.draw.id);
       dispatch({ type: "DRAW_SUCCESS", payload: response.data.data });
     } catch (requestError) {
       dispatch({ type: "DRAW_FAILURE", error: requestError });
     } finally {
-      actionRef.current = null;
+      tracker.settleMutation();
+      const drawId = tracker.takeCleanupDrawId();
+      if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
     }
   }
 
   async function confirm() {
-    if (!canConfirm(state) || actionRef.current) return;
-    actionRef.current = "confirm";
+    if (!canConfirm(state) || !tracker.beginMutation()) return;
     dispatch({ type: "CONFIRM_START" });
     try {
       const response = await api.post(`${endpoint}/draws/${state.pendingDraw.id}/confirm`);
-      pendingRef.current = null;
+      tracker.setPendingDraw(null);
       dispatch({ type: "CONFIRM_SUCCESS", payload: response.data.data });
     } catch (requestError) {
       dispatch({ type: "CONFIRM_FAILURE", error: requestError });
     } finally {
-      actionRef.current = null;
+      tracker.settleMutation();
+      const drawId = tracker.takeCleanupDrawId();
+      if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
     }
   }
 
   async function drawAgain() {
-    if (!canCancel(state) || actionRef.current) return;
-    actionRef.current = "cancel";
+    if (!canCancel(state) || !tracker.beginMutation()) return;
     dispatch({ type: "CANCEL_START" });
     try {
       const response = await api.delete(`${endpoint}/draws/${state.pendingDraw.id}`);
-      pendingRef.current = null;
+      tracker.setPendingDraw(null);
       dispatch({ type: "CANCEL_SUCCESS", payload: response.data.data });
     } catch (requestError) {
       dispatch({ type: "CANCEL_FAILURE", error: requestError });
     } finally {
-      actionRef.current = null;
+      tracker.settleMutation();
+      const drawId = tracker.takeCleanupDrawId();
+      if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
     }
   }
 
@@ -147,7 +166,7 @@ function RaffleShell({ user, logout, eventId }) {
                 <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <span className="flex-1">{state.error || logoutError}</span>
                 {state.error && state.event && (
-                  <button type="button" className="shrink-0 font-semibold underline underline-offset-2" onClick={() => mutate()}>
+                  <button type="button" className="shrink-0 font-semibold underline underline-offset-2" disabled={busy} onClick={refresh}>
                     Refresh raffle
                   </button>
                 )}
@@ -162,7 +181,7 @@ function RaffleShell({ user, logout, eventId }) {
             ) : state.status === "error" && !state.event ? (
               <Card className="flex min-h-64 flex-col items-center justify-center gap-4 p-6 text-center">
                 <p className="text-sm text-[#6f625b]">The raffle could not be loaded.</p>
-                <Button type="button" onClick={() => mutate()}>Try again</Button>
+                <Button type="button" onClick={refresh}>Try again</Button>
               </Card>
             ) : (
               <>
