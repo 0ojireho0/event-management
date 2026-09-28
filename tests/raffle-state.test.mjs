@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as raffle from "../lib/raffle-state.mjs";
 
 import {
   canCancel,
@@ -254,4 +255,109 @@ test("cached raffle data is ignored after a local request and an overlapping ref
   assert.equal(tracker.shouldApplySnapshot(refreshToken), false);
   assert.equal(tracker.cachedLoadAction(payload), null);
   assert.notEqual(tracker.beginRefresh(), null);
+});
+
+test("account switching cannot load another admin's cached event, attendees, or winner history", () => {
+  const cache = new Map();
+  const payload = { event: { id: 1, title: "Admin A private event" }, eligible_attendees: [bob], eligible_count: 1, pending_draw: null, winners: [winner] };
+  const ownerKey = raffle.getRaffleCacheKey(10, "sample");
+  const otherKey = raffle.getRaffleCacheKey(20, "sample");
+  cache.set(JSON.stringify(ownerKey), payload);
+  const owner = createRaffleRequestTracker();
+  const ownerState = raffleReducer(createRaffleState(), owner.cachedLoadAction(payload));
+  assert.equal(ownerState.winners.length, 1);
+  owner.dispose();
+  const other = createRaffleRequestTracker();
+  const cachedAction = other.cachedLoadAction(cache.get(JSON.stringify(otherKey)));
+  assert.equal(cachedAction, null);
+  const denied = raffleReducer(createRaffleState(), other.cachedLoadAction(undefined, { response: { status: 404 } }));
+  assert.deepEqual(denied.eligibleAttendees, []);
+  assert.deepEqual(denied.winners, []);
+  assert.equal(denied.event, null);
+  assert.equal(raffle.getRaffleCacheKey(undefined, "sample"), null);
+});
+
+test("authorization errors erase every protected raffle field even during a mutation", () => {
+  for (const status of [401, 403, 404]) {
+    for (const type of ["LOAD_FAILURE", "DRAW_FAILURE", "CONFIRM_FAILURE", "CANCEL_FAILURE"]) {
+      const state = { ...loaded({ winners: [winner], pending_draw: { ...draw, ...alice } }), status: "confirming", lastWinner: winner };
+      const denied = raffleReducer(state, { type, error: { response: { status } } });
+      assert.equal(denied.event, null);
+      assert.deepEqual(denied.eligibleAttendees, []);
+      assert.deepEqual(denied.winners, []);
+      assert.equal(denied.pendingDraw, null);
+      assert.equal(denied.selectedAttendee, null);
+      assert.equal(denied.lastWinner, null);
+      assert.equal(denied.eligibleCount, 0);
+    }
+  }
+});
+
+test("a newly reserved draw has the same remaining count as its reloaded pending snapshot", () => {
+  const reserved = raffleReducer(raffleReducer(loaded(), { type: "DRAW_START" }), { type: "DRAW_SUCCESS", payload: { draw, attendee: alice } });
+  const reloaded = loaded({ eligible_attendees: [bob], eligible_count: 1, pending_draw: { ...draw, ...alice } });
+  assert.equal(reserved.eligibleCount, 1);
+  assert.deepEqual(reserved.eligibleAttendees, [bob]);
+  assert.equal(reserved.eligibleCount, reloaded.eligibleCount);
+  assert.deepEqual(getWheelAttendees(reserved), [bob, alice]);
+});
+
+for (const operation of ["CONFIRM", "CANCEL"]) {
+  test(`${operation} conflicts disable stale controls until authoritative state is applied`, () => {
+    const pending = loaded({ eligible_attendees: [bob], eligible_count: 1, pending_draw: { ...draw, ...alice } });
+    const failed = raffleReducer(raffleReducer(pending, { type: `${operation}_START` }), { type: `${operation}_FAILURE`, error: { response: { status: 409 } } });
+    assert.equal(canConfirm(failed), false);
+    assert.equal(canCancel(failed), false);
+    assert.equal(canStartDraw(failed), false);
+    assert.equal(failed.pendingDraw, null);
+    assert.equal(failed.selectedAttendee, null);
+    const offline = raffleReducer(failed, { type: "LOAD_FAILURE", error: new Error("offline") });
+    assert.equal(canStartDraw(offline), false);
+  });
+
+  for (const outcome of ["confirmed", "cancelled", "expired"]) {
+    test(`${operation} recovers automatically when another tab or a lost response already ${outcome} the draw`, async () => {
+      let state = loaded({ eligible_attendees: [bob], eligible_count: 1, pending_draw: { ...draw, ...alice } });
+      const tracker = createRaffleRequestTracker();
+      tracker.setPendingDraw(draw.id);
+      const staleToken = tracker.beginRefresh();
+      const payload = { event: state.event, eligible_attendees: outcome === "confirmed" ? [bob] : [alice, bob], eligible_count: outcome === "confirmed" ? 1 : 2, pending_draw: null, winners: outcome === "confirmed" ? [winner] : [] };
+      await raffle.runRaffleMutation({
+        operation, tracker,
+        dispatch: (action) => { state = raffleReducer(state, action); },
+        request: async () => { throw { response: { status: 409, data: { message: "Draw is no longer pending." } } }; },
+        refresh: async () => {
+          const token = tracker.beginRefresh({ supersede: true });
+          assert.notEqual(token, null, "reconciliation must start after releasing the mutation guard");
+          tracker.settleRefresh(staleToken);
+          assert.equal(tracker.beginRefresh(), null, "old request completion cannot release the current refresh");
+          assert.equal(tracker.shouldApplySnapshot(staleToken), false);
+          if (tracker.shouldApplySnapshot(token)) state = raffleReducer(state, { type: "LOAD_SUCCESS", payload });
+          tracker.settleRefresh(token);
+        },
+        cleanup: () => {},
+      });
+      assert.equal(state.pendingDraw, null);
+      assert.equal(state.selectedAttendee, null);
+      assert.equal(state.eligibleCount, outcome === "confirmed" ? 1 : 2);
+      assert.deepEqual(state.winners, outcome === "confirmed" ? [winner] : []);
+      assert.equal(canStartDraw(state), true);
+    });
+  }
+}
+
+test("a transient lost response keeps the reservation retryable until the retry reports a conflict", async () => {
+  for (const operation of ["CONFIRM", "CANCEL"]) {
+    let state = loaded({ eligible_attendees: [bob], eligible_count: 1, pending_draw: { ...draw, ...alice } });
+    await raffle.runRaffleMutation({
+      operation, tracker: createRaffleRequestTracker(),
+      dispatch: (action) => { state = raffleReducer(state, action); },
+      request: async () => { throw new Error("response lost"); },
+      refresh: () => assert.fail("transient failure should preserve the provisional draw"),
+      cleanup: () => {},
+    });
+    assert.equal(state.status, "pending");
+    assert.equal(state.pendingDraw.id, 50);
+    assert.equal(canConfirm(state), true);
+  }
 });

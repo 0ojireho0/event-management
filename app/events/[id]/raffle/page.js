@@ -19,9 +19,12 @@ import {
   canStartDraw,
   createRaffleRequestTracker,
   createRaffleState,
+  getRaffleCacheKey,
   getRaffleErrorMessage,
   getWheelAttendees,
+  isRaffleAccessError,
   raffleReducer,
+  runRaffleMutation,
 } from "@/lib/raffle-state.mjs";
 
 function attendeeName(attendee) {
@@ -35,15 +38,18 @@ function RaffleShell({ user, logout, eventId }) {
   const [tracker] = useState(createRaffleRequestTracker);
   const endpoint = `/api/events/${encodeURIComponent(eventId)}/raffle`;
   const { data, error, mutate } = useSWR(
-    endpoint,
-    (url) => api.get(url).then((response) => response.data.data),
+    getRaffleCacheKey(user.id, eventId),
+    ([url]) => api.get(url).then((response) => response.data.data),
     { revalidateOnFocus: false, revalidateOnReconnect: false },
   );
 
   useEffect(() => {
     const action = tracker.cachedLoadAction(data, error);
-    if (action) dispatch(action);
-  }, [data, error, tracker]);
+    if (action) {
+      dispatch(action);
+      if (isRaffleAccessError(error) && data) mutate(undefined, { revalidate: false }).catch(() => {});
+    }
+  }, [data, error, mutate, tracker]);
 
   useEffect(() => {
     tracker.resume();
@@ -57,8 +63,8 @@ function RaffleShell({ user, logout, eventId }) {
     };
   }, [endpoint, tracker]);
 
-  async function refresh() {
-    const token = tracker.beginRefresh();
+  async function refresh(options) {
+    const token = tracker.beginRefresh(options);
     if (!token) return;
     try {
       const response = await api.get(endpoint);
@@ -68,58 +74,52 @@ function RaffleShell({ user, logout, eventId }) {
       dispatch({ type: "LOAD_SUCCESS", payload });
       mutate(payload, { revalidate: false }).catch(() => {});
     } catch (requestError) {
-      if (tracker.shouldApplySnapshot(token)) dispatch({ type: "LOAD_FAILURE", error: requestError });
+      if (tracker.shouldApplySnapshot(token)) {
+        if (isRaffleAccessError(requestError)) {
+          tracker.setPendingDraw(null);
+          mutate(undefined, { revalidate: false }).catch(() => {});
+        }
+        dispatch({ type: "LOAD_FAILURE", error: requestError });
+      }
     } finally {
-      tracker.settleRefresh();
+      tracker.settleRefresh(token);
     }
+  }
+
+  function mutateDraw(operation, request) {
+    return runRaffleMutation({
+      operation,
+      tracker,
+      dispatch,
+      request: async () => {
+        try {
+          return (await request()).data.data;
+        } catch (requestError) {
+          if (isRaffleAccessError(requestError)) mutate(undefined, { revalidate: false }).catch(() => {});
+          throw requestError;
+        }
+      },
+      refresh: () => refresh({ supersede: true }),
+      cleanup: () => {
+        const drawId = tracker.takeCleanupDrawId();
+        if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
+      },
+    });
   }
 
   async function spin() {
-    if (!canStartDraw(state) || !tracker.beginMutation()) return;
-    dispatch({ type: "DRAW_START" });
-    try {
-      const response = await api.post(`${endpoint}/draws`);
-      tracker.setPendingDraw(response.data.data.draw.id);
-      dispatch({ type: "DRAW_SUCCESS", payload: response.data.data });
-    } catch (requestError) {
-      dispatch({ type: "DRAW_FAILURE", error: requestError });
-    } finally {
-      tracker.settleMutation();
-      const drawId = tracker.takeCleanupDrawId();
-      if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
-    }
+    if (!canStartDraw(state)) return;
+    await mutateDraw("DRAW", () => api.post(`${endpoint}/draws`));
   }
 
   async function confirm() {
-    if (!canConfirm(state) || !tracker.beginMutation()) return;
-    dispatch({ type: "CONFIRM_START" });
-    try {
-      const response = await api.post(`${endpoint}/draws/${state.pendingDraw.id}/confirm`);
-      tracker.setPendingDraw(null);
-      dispatch({ type: "CONFIRM_SUCCESS", payload: response.data.data });
-    } catch (requestError) {
-      dispatch({ type: "CONFIRM_FAILURE", error: requestError });
-    } finally {
-      tracker.settleMutation();
-      const drawId = tracker.takeCleanupDrawId();
-      if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
-    }
+    if (!canConfirm(state)) return;
+    await mutateDraw("CONFIRM", () => api.post(`${endpoint}/draws/${state.pendingDraw.id}/confirm`));
   }
 
   async function drawAgain() {
-    if (!canCancel(state) || !tracker.beginMutation()) return;
-    dispatch({ type: "CANCEL_START" });
-    try {
-      const response = await api.delete(`${endpoint}/draws/${state.pendingDraw.id}`);
-      tracker.setPendingDraw(null);
-      dispatch({ type: "CANCEL_SUCCESS", payload: response.data.data });
-    } catch (requestError) {
-      dispatch({ type: "CANCEL_FAILURE", error: requestError });
-    } finally {
-      tracker.settleMutation();
-      const drawId = tracker.takeCleanupDrawId();
-      if (drawId !== null) api.delete(`${endpoint}/draws/${drawId}`).catch(() => {});
-    }
+    if (!canCancel(state)) return;
+    await mutateDraw("CANCEL", () => api.delete(`${endpoint}/draws/${state.pendingDraw.id}`));
   }
 
   async function handleLogout() {
@@ -131,7 +131,7 @@ function RaffleShell({ user, logout, eventId }) {
     }
   }
 
-  const busy = ["drawing", "confirming", "cancelling"].includes(state.status);
+  const busy = ["drawing", "confirming", "cancelling", "reconciling"].includes(state.status);
   const selected = state.selectedAttendee;
   const currentWinner = state.status === "spinning" ? null : state.lastWinner || selected;
   const wheelAttendees = getWheelAttendees(state);
@@ -207,6 +207,7 @@ function RaffleShell({ user, logout, eventId }) {
                       {state.status === "empty" && <p className="rounded-xl bg-[#fff4ee] p-4 text-sm text-[#6f625b]">No confirmed registrations are available yet.</p>}
                       {state.status === "exhausted" && <p className="rounded-xl bg-[#fff4ee] p-4 text-sm text-[#6f625b]">All eligible attendees have already won.</p>}
                       {state.status === "drawing" && <p role="status" className="text-sm text-[#6f625b]">Selecting an attendee...</p>}
+                      {state.status === "reconciling" && <p role="status" className="text-sm text-[#6f625b]">Updating raffle...</p>}
                       {state.status === "spinning" && <p role="status" className="text-sm text-[#6f625b]">Spinning to the selected attendee...</p>}
 
                       {currentWinner && (
@@ -272,5 +273,5 @@ function RaffleShell({ user, logout, eventId }) {
 
 export default function EventRafflePage() {
   const { id } = useParams();
-  return <RoleGate>{({ user, logout }) => <RaffleShell key={id} eventId={id} user={user} logout={logout} />}</RoleGate>;
+  return <RoleGate>{({ user, logout }) => <RaffleShell key={JSON.stringify(getRaffleCacheKey(user.id, id))} eventId={id} user={user} logout={logout} />}</RoleGate>;
 }
