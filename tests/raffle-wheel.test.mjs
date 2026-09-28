@@ -66,3 +66,34 @@ test("formats first and last names without exposing masked or full email", () =>
     email: "jamie@example.com",
   }), "Jamie Rivera");
 });
+
+test("wheel input signature is stable across equivalent attendee references", () => {
+  assert.equal(typeof wheel.getWheelInputSignature, "function");
+  const original = [attendee(1), attendee(2)];
+  const equivalent = original.map((person) => ({ ...person }));
+
+  assert.equal(
+    wheel.getWheelInputSignature(original, 2),
+    wheel.getWheelInputSignature(equivalent, "2"),
+  );
+});
+
+test("wheel input signature changes for pool, name, or selected-result changes", () => {
+  const original = [attendee(1), attendee(2)];
+  const signature = wheel.getWheelInputSignature(original, 2);
+
+  assert.notEqual(wheel.getWheelInputSignature([attendee(1), attendee(3)], 2), signature);
+  assert.notEqual(wheel.getWheelInputSignature([attendee(2), attendee(1)], 2), signature);
+  assert.notEqual(wheel.getWheelInputSignature([{ ...attendee(1), first_name: "Renamed" }, attendee(2)], 2), signature);
+  assert.notEqual(wheel.getWheelInputSignature(original, 1), signature);
+});
+
+test("wheel segment cache preserves segment identity for equivalent rerenders", () => {
+  assert.equal(typeof wheel.createWheelSegmentsCache, "function");
+  const getSegments = wheel.createWheelSegmentsCache();
+  const original = [attendee(1), attendee(2)];
+  const segments = getSegments(original, 2);
+
+  assert.strictEqual(getSegments(original.map((person) => ({ ...person })), 2), segments);
+  assert.notStrictEqual(getSegments(original, 1), segments);
+});

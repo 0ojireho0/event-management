@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { buildWheelSegments, formatWheelName, getWinnerRotation } from "../../lib/raffle-wheel.mjs";
+import { createWheelSegmentsCache, formatWheelName, getWinnerRotation } from "../../lib/raffle-wheel.mjs";
 
 const TAU = Math.PI * 2;
 const NORMAL_SPIN_MS = 5600;
@@ -96,9 +96,11 @@ export function RaffleWheel({ attendees = [], selectedRegistrationId = null, spi
   const activeSpinRef = useRef(false);
   const completedSpinRef = useRef(false);
   const onSpinEndRef = useRef(onSpinEnd);
+  const selectedId = selectedRegistrationId == null ? null : String(selectedRegistrationId);
+  const getSegments = useMemo(() => createWheelSegmentsCache(), []);
   const segments = useMemo(
-    () => buildWheelSegments(attendees, selectedRegistrationId),
-    [attendees, selectedRegistrationId],
+    () => getSegments(attendees, selectedId),
+    [attendees, selectedId, getSegments],
   );
 
   useEffect(() => {
@@ -108,12 +110,12 @@ export function RaffleWheel({ attendees = [], selectedRegistrationId = null, spi
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const redraw = () => drawWheel(canvas, segments, selectedRegistrationId);
+    const redraw = () => drawWheel(canvas, segments, selectedId);
     redraw();
     const observer = new ResizeObserver(redraw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [segments, selectedRegistrationId]);
+  }, [segments, selectedId]);
 
   useEffect(() => {
     if (!spinning) {
@@ -123,7 +125,7 @@ export function RaffleWheel({ attendees = [], selectedRegistrationId = null, spi
     }
     if (activeSpinRef.current || completedSpinRef.current || !wheelRef.current) return;
 
-    const landing = getWinnerRotation(segments, selectedRegistrationId);
+    const landing = getWinnerRotation(segments, selectedId);
     if (landing === 0) return;
 
     activeSpinRef.current = true;
@@ -162,7 +164,7 @@ export function RaffleWheel({ attendees = [], selectedRegistrationId = null, spi
       wheel.removeEventListener("transitionend", handleTransitionEnd);
       activeSpinRef.current = false;
     };
-  }, [segments, selectedRegistrationId, spinning]);
+  }, [segments, selectedId, spinning]);
 
   return (
     <div className="relative mx-auto w-full max-w-[560px] select-none p-3" role="img" aria-label={
