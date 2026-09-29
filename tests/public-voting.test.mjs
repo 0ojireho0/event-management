@@ -51,18 +51,18 @@ test("unexpected server errors do not expose response details", () => {
   assert.deepEqual(result, { message: "Something went wrong. Please try again." });
 });
 
-test("public lookup projects only the ballot title and choices", async () => {
+test("public lookup accepts the bare backend ballot and projects only title and choices", async () => {
   let request;
   const ballot = await loadPublicBallot("opaque slug", {
     baseUrl: "https://api.example.test",
     fetchImpl: async (...args) => {
       request = args;
-      return { ok: true, json: async () => ({ data: {
+      return { ok: true, json: async () => ({
         title: "Best performer",
         contestants: [{ id: 7, name: "Ava", votes: 42, rank: 1 }, { id: 8, name: "Bea" }],
         total_votes: 42,
         registrations: [{ code: "SECRET" }],
-      } }) };
+      }) };
     },
   });
 
