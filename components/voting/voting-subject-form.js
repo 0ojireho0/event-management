@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { toVotingSubjectPayload, validateVotingSubject } from "@/lib/voting-subjects.mjs";
+import { mapVotingSubjectFieldErrors, toVotingSubjectPayload, validateVotingSubject } from "@/lib/voting-subjects.mjs";
 
 let nextRowId = 0;
 function row(name = "") { return { id: ++nextRowId, name }; }
@@ -29,8 +29,7 @@ export function VotingSubjectForm({ open, subject, onOpenChange, onSave }) {
     } catch (error) {
       const fieldErrors = error.response?.data?.errors;
       setErrors({
-        title: fieldErrors?.title?.[0],
-        contestants: fieldErrors?.contestants?.[0],
+        ...mapVotingSubjectFieldErrors(fieldErrors, rows),
         form: error.response?.data?.message || "The voting subject could not be saved. Try again.",
       });
     } finally {
@@ -40,7 +39,11 @@ export function VotingSubjectForm({ open, subject, onOpenChange, onSave }) {
 
   function updateRow(id, name) {
     setRows((current) => current.map((item) => item.id === id ? { ...item, name } : item));
-    setErrors((current) => ({ ...current, contestants: undefined, form: undefined }));
+    setErrors((current) => {
+      const contestantRows = { ...current.contestantRows };
+      delete contestantRows[id];
+      return { ...current, contestantRows, contestants: undefined, form: undefined };
+    });
   }
 
   return (
@@ -64,7 +67,10 @@ export function VotingSubjectForm({ open, subject, onOpenChange, onSave }) {
               {rows.map((item, index) => (
                 <div key={item.id} className="flex items-center gap-2">
                   <label htmlFor={`voting-contestant-${item.id}`} className="w-7 shrink-0 text-center text-xs font-semibold text-[#96877f]">{index + 1}</label>
-                  <Input id={`voting-contestant-${item.id}`} value={item.name} maxLength={256} aria-label={`Contestant ${index + 1} name`} aria-invalid={Boolean(errors.contestants)} onChange={(event) => updateRow(item.id, event.target.value)} placeholder="Contestant name" />
+                  <div className="min-w-0 flex-1">
+                    <Input id={`voting-contestant-${item.id}`} value={item.name} maxLength={256} aria-label={`Contestant ${index + 1} name`} aria-invalid={Boolean(errors.contestants || errors.contestantRows?.[item.id])} aria-describedby={errors.contestantRows?.[item.id] ? `voting-contestant-${item.id}-error` : undefined} onChange={(event) => updateRow(item.id, event.target.value)} placeholder="Contestant name" />
+                    {errors.contestantRows?.[item.id] && <p id={`voting-contestant-${item.id}-error`} role="alert" className="mt-1 text-xs text-[#93000a]">{errors.contestantRows[item.id]}</p>}
+                  </div>
                   <Button type="button" variant="ghost" size="icon" aria-label={`Remove contestant ${index + 1}`} disabled={rows.length <= 2 || saving} onClick={() => setRows((current) => current.filter((entry) => entry.id !== item.id))}><Trash2 /></Button>
                 </div>
               ))}

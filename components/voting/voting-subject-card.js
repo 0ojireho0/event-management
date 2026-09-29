@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getVotingSubjectActions } from "@/lib/voting-subjects.mjs";
+import { getContestantPosition, getVotingSubjectActions } from "@/lib/voting-subjects.mjs";
 
 export function VotingSubjectCard({ subject, eventSlug, busyAction, onEdit, onConfirm, onQr }) {
   const actions = getVotingSubjectActions(subject.status);
@@ -22,7 +22,7 @@ export function VotingSubjectCard({ subject, eventSlug, busyAction, onEdit, onCo
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[#6f625b]"><span>{subject.contestant_count} contestant{subject.contestant_count === 1 ? "" : "s"}</span><span>{subject.total_votes} vote{subject.total_votes === 1 ? "" : "s"}</span></div>
         <ol className="max-h-32 space-y-1 overflow-auto rounded-xl bg-[#fffaf7] px-4 py-3 text-sm text-[#6f625b]">
-          {subject.contestants.map((contestant) => <li key={contestant.id} className="truncate">{contestant.display_order}. {contestant.name}</li>)}
+          {subject.contestants.map((contestant) => <li key={contestant.id} className="truncate">{getContestantPosition(contestant.display_order)}. {contestant.name}</li>)}
         </ol>
       </div>
       <div className="flex flex-wrap gap-2 border-t border-[#ffdece] bg-[#fffaf7] p-4 sm:px-6">

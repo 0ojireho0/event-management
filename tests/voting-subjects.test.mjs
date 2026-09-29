@@ -1,7 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getVotingSubjectActions, getVotingSubjectUrl, getVotingQrFilename, normalizeContestants, toVotingSubjectPayload, validateVotingSubject } from "../lib/voting-subjects.mjs";
+import * as votingSubjects from "../lib/voting-subjects.mjs";
+
+const { getVotingSubjectActions, getVotingSubjectUrl, getVotingQrFilename, normalizeContestants, toVotingSubjectPayload, validateVotingSubject } = votingSubjects;
+
+test("contestant card positions start at one for zero-based stored order", () => {
+  assert.equal(votingSubjects.getContestantPosition?.(0), 1);
+  assert.equal(votingSubjects.getContestantPosition?.(2), 3);
+});
+
+test("backend contestant errors target their submitted rows even when blank rows were omitted", () => {
+  const rows = [
+    { id: 11, name: "Ava" },
+    { id: 12, name: " " },
+    { id: 13, name: "Bea" },
+  ];
+  assert.deepEqual(votingSubjects.mapVotingSubjectFieldErrors?.({
+    title: ["A title is required."],
+    "contestants.1.name": ["Contestant names must be unique."],
+  }, rows), {
+    title: "A title is required.",
+    contestantRows: { 13: "Contestant names must be unique." },
+  });
+});
 
 test("normalization trims names and drops blank rows while keeping their order", () => {
   assert.deepEqual(normalizeContestants(["  Ava  ", " ", "Bea", "\t"]), ["Ava", "Bea"]);
