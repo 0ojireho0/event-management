@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LeaderboardRow } from "@/components/voting/leaderboard-row";
 import api from "@/lib/api";
-import { getLeaderboardRefreshInterval, getRankedContestants } from "@/lib/voting-leaderboard.mjs";
+import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload } from "@/lib/voting-leaderboard.mjs";
 import { getVotingSubjectUrl } from "@/lib/voting-subjects.mjs";
 
 function subscribeToVisibility(onChange) {
@@ -38,7 +38,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
 
   const { data: results, error, isLoading, mutate } = useSWR(
     [resultsEndpoint, String(userId)],
-    ([url]) => api.get(url).then((response) => response.data.data),
+    ([url]) => api.get(url).then(getVotingResultsPayload),
     {
       keepPreviousData: true,
       revalidateOnFocus: false,

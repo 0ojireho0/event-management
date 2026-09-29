@@ -1,7 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getLeaderboardRefreshInterval, getRankedContestants } from "../lib/voting-leaderboard.mjs";
+import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload } from "../lib/voting-leaderboard.mjs";
+
+test("results fetcher reads the root backend payload from an Axios response", () => {
+  const payload = {
+    event: { id: 12, slug: "gala", title: "Gala" },
+    subject: { id: 5, slug: "best-singer", title: "Best singer", status: "active" },
+    total_votes: 3,
+    total_registrations: 10,
+    participation_percentage: 30,
+    contestants: [
+      { id: 8, name: "Ava", display_order: 1, votes: 2, percentage: 66.67 },
+      { id: 9, name: "Bea", display_order: 2, votes: 1, percentage: 33.33 },
+    ],
+  };
+
+  assert.deepEqual(getVotingResultsPayload({ data: payload }), payload);
+});
 
 test("ranked contestants keep the backend vote order and percentages", () => {
   const rows = getRankedContestants([
