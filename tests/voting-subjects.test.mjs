@@ -71,6 +71,13 @@ test("QR download filename removes unsafe title characters and has a fallback", 
   assert.equal(getVotingQrFilename(" ? "), "voting-subject-qr.png");
 });
 
+test("a closing QR dialog does not render an image after its subject is cleared", () => {
+  assert.equal(votingSubjects.shouldRenderVotingQrImage(null, "data:image/png;base64,qr", false), false);
+  assert.equal(votingSubjects.shouldRenderVotingQrImage({ title: "Choice" }, "data:image/png;base64,qr", false), true);
+  assert.equal(votingSubjects.shouldRenderVotingQrImage({ title: "Choice" }, "", false), false);
+  assert.equal(votingSubjects.shouldRenderVotingQrImage({ title: "Choice" }, "data:image/png;base64,qr", true), false);
+});
+
 test("subject mutations address the event and subject by their slugs", () => {
   assert.equal(getVotingSubjectUrl("summer gala", "people's choice"), "/api/events/summer%20gala/voting-subjects/people's%20choice");
 });
