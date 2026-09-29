@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getVotingQrFilename } from "@/lib/voting-subjects.mjs";
 
-export function VotingQrDialog({ subject, onOpenChange }) {
+export function VotingQrDialog({ subject, onOpenChange, onCloseAutoFocus }) {
   const [imageUrl, setImageUrl] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +36,7 @@ export function VotingQrDialog({ subject, onOpenChange }) {
 
   return (
     <Dialog open={Boolean(subject)} onOpenChange={onOpenChange}>
-      <DialogContent className="p-6 sm:p-8">
+      <DialogContent className="p-6 sm:p-8" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader className="pr-8">
           <DialogTitle>Voting QR code</DialogTitle>
           <DialogDescription>{subject?.title} · Share this link with voters.</DialogDescription>

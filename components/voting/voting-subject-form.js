@@ -11,7 +11,7 @@ import { mapVotingSubjectFieldErrors, toVotingSubjectPayload, validateVotingSubj
 let nextRowId = 0;
 function row(name = "") { return { id: ++nextRowId, name }; }
 
-export function VotingSubjectForm({ open, subject, onOpenChange, onSave }) {
+export function VotingSubjectForm({ open, subject, onOpenChange, onCloseAutoFocus, onSave }) {
   const [title, setTitle] = useState(subject?.title || "");
   const [rows, setRows] = useState(() => subject?.contestants?.map((contestant) => row(contestant.name)) || [row(), row()]);
   const [errors, setErrors] = useState({});
@@ -48,7 +48,7 @@ export function VotingSubjectForm({ open, subject, onOpenChange, onSave }) {
 
   return (
     <Dialog open={open} onOpenChange={(value) => { if (!saving) onOpenChange(value); }}>
-      <DialogContent className="max-w-2xl p-0">
+      <DialogContent className="max-w-2xl p-0" onCloseAutoFocus={onCloseAutoFocus}>
         <form onSubmit={submit} className="flex max-h-[calc(100vh-2rem)] flex-col">
           <DialogHeader className="shrink-0 border-b border-[#ffdece] bg-[#fff4ee] px-5 py-5 pr-14 sm:px-6 sm:pr-16">
             <DialogTitle>{subject ? "Edit voting subject" : "Create voting subject"}</DialogTitle>

@@ -3,7 +3,7 @@
 import { ArrowLeft, CircleAlert, LoaderCircle, Radio, RotateCw, Users, Vote } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 
 import { RoleGate } from "@/components/auth/role-gate";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LeaderboardRow } from "@/components/voting/leaderboard-row";
 import api from "@/lib/api";
+import { restoreDialogFocus } from "@/lib/dialog-focus.mjs";
 import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload } from "@/lib/voting-leaderboard.mjs";
 import { getVotingSubjectUrl } from "@/lib/voting-subjects.mjs";
 
@@ -35,6 +36,8 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
   const [confirmation, setConfirmation] = useState(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const dialogOpenerRef = useRef(null);
+  const managementLinkRef = useRef(null);
 
   const { data: results, error, isLoading, mutate } = useSWR(
     [resultsEndpoint, String(userId)],
@@ -87,7 +90,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
     <main className="min-h-screen bg-[#fffaf7] px-4 py-5 text-[#25170f] sm:px-8 sm:py-8">
       <div className="mx-auto max-w-5xl space-y-7">
         <header className="space-y-6">
-          <Button asChild variant="ghost" size="sm"><Link href={managementHref}><ArrowLeft /> Voting management</Link></Button>
+          <Button asChild variant="ghost" size="sm"><Link ref={managementLinkRef} href={managementHref}><ArrowLeft /> Voting management</Link></Button>
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-bold tracking-[0.14em] text-[#f6671e] uppercase">Private leaderboard</p>
@@ -111,14 +114,14 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
           </section>
 
           <section aria-labelledby="leaderboard-heading" className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.12em] text-[#f6671e] uppercase">Standings</p><h2 id="leaderboard-heading" className="mt-1 text-2xl font-bold">Contestants</h2></div>{lifecycleAction && <Button type="button" variant={lifecycleAction === "close" ? "amber" : "default"} onClick={() => { setActionError(""); setConfirmation(lifecycleAction); }}>{lifecycleAction === "activate" ? "Activate voting" : "Close voting"}</Button>}</div>
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.12em] text-[#f6671e] uppercase">Standings</p><h2 id="leaderboard-heading" className="mt-1 text-2xl font-bold">Contestants</h2></div>{lifecycleAction && <Button type="button" variant={lifecycleAction === "close" ? "amber" : "default"} onClick={(event) => { dialogOpenerRef.current = event.currentTarget; setActionError(""); setConfirmation(lifecycleAction); }}>{lifecycleAction === "activate" ? "Activate voting" : "Close voting"}</Button>}</div>
             {results.total_votes === 0 ? <div className="rounded-2xl border-2 border-dashed border-[#f3c7b2] bg-white px-6 py-12 text-center"><Vote className="mx-auto size-10 text-[#f6671e]" aria-hidden="true" /><h3 className="mt-4 text-xl font-bold">No votes yet</h3><p className="mt-2 text-sm text-[#6f625b]">Results will appear here when attendees start voting.</p></div> : <ol className="space-y-3">{contestants.map((contestant) => <LeaderboardRow key={contestant.id} contestant={contestant} />)}</ol>}
           </section>
         </>}
       </div>
 
       <Dialog open={Boolean(confirmation)} onOpenChange={(open) => { if (!open && !busy) { setConfirmation(null); setActionError(""); } }}>
-        <DialogContent className="p-6">
+        <DialogContent className="p-6" onCloseAutoFocus={(event) => restoreDialogFocus(event, dialogOpenerRef.current, managementLinkRef.current)}>
           <DialogHeader className="pr-8"><DialogTitle>{confirmation === "activate" ? "Activate voting?" : "Close voting?"}</DialogTitle><DialogDescription>{confirmation === "activate" ? "This ballot will become available to voters. Its title and contestants can no longer be edited." : "Voters will no longer be able to cast votes for this subject."}</DialogDescription></DialogHeader>
           {actionError && <p role="alert" className="rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-[#93000a]">{actionError}</p>}
           <DialogFooter><Button type="button" variant="secondary" disabled={busy} onClick={() => { setConfirmation(null); setActionError(""); }}>Cancel</Button><Button type="button" variant={confirmation === "close" ? "amber" : "default"} disabled={busy} onClick={confirmLifecycleAction}>{busy ? "Working..." : confirmation === "activate" ? "Activate voting" : "Close voting"}</Button></DialogFooter>
