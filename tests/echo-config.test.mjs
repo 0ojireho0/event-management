@@ -99,3 +99,45 @@ test("private authorization uses the existing credentialed Axios client and repo
     }
   `);
 });
+
+test("leaderboard subscribes privately to the exact Laravel event and leaves without disconnecting shared Echo", () => {
+  runEcho(`${configured}
+    globalThis.window = {};
+    const Pusher = (await import('pusher-js')).default;
+    Pusher.prototype.connect = function () {};
+    const { getEcho, getNominationChannelName } = await import('./lib/echo.js');
+    const leaderboard = await import('./lib/voting-leaderboard.mjs');
+    const assert = (await import('node:assert/strict')).default;
+    assert.equal(typeof leaderboard.subscribeToNominationLeaderboard, 'function');
+    const echo = getEcho();
+    const statuses = [];
+    const snapshots = [];
+    let refreshed = 0;
+    const stop = leaderboard.subscribeToNominationLeaderboard({
+      echo, channelName: getNominationChannelName(12, 34), eventId: 12, subjectId: 34,
+      mode: 'nomination', status: 'active', onStatus: (value) => statuses.push(value),
+      onSnapshot: (value) => snapshots.push(value), revalidate: async () => { refreshed++; },
+    });
+    const channel = echo.connector.channels['private-events.12.nominations.34'];
+    assert.ok(channel);
+    assert.equal(echo.connector.channels['events.12.nominations.34'], undefined);
+    const snapshot = {
+      event: { id: 12, slug: 'gala', title: 'Gala' },
+      subject: { id: 34, slug: 'singer', title: 'Singer', status: 'active' },
+      total_votes: 1, total_registrations: 2, participation_percentage: 50,
+      contestants: [{ id: 7, name: 'Ava', display_order: 0, votes: 1, rank: 1, percentage: 100 }],
+    };
+    channel.subscription.emit('App\\\\Events\\\\NominationStatisticsUpdated', snapshot);
+    assert.deepEqual(snapshots, [snapshot]);
+    channel.subscription.emit('pusher:subscription_succeeded', {});
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(refreshed, 1);
+    assert.equal(statuses.at(-1), 'connected');
+    echo.connector.pusher.connection.emit('state_change', { previous: 'connected', current: 'disconnected' });
+    assert.equal(statuses.at(-1), 'disconnected');
+    stop();
+    assert.equal(echo.connector.channels['private-events.12.nominations.34'], undefined);
+    assert.equal(getEcho(), echo);
+    assert.equal(echo.connector.pusher.connection.state, 'initialized');
+  `);
+});
