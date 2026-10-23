@@ -143,6 +143,23 @@ test("compact update rejects missing rosters, mismatched counts, and inconsisten
   ]) assert.equal(projectNominationStatistics(nominationSnapshot, update, 12, 5), null);
 });
 
+test("out-of-order compact snapshots trigger REST recovery instead of rolling totals backwards", async () => {
+  const lowerVotes = { ...compactNominationUpdate, total_votes: 1, contestant_votes: [1] };
+  const fewerRegistrations = { ...compactNominationUpdate, total_registrations: 9 };
+
+  assert.equal(projectNominationStatistics(nominationSnapshot, lowerVotes, 12, 5), null);
+  assert.equal(projectNominationStatistics(nominationSnapshot, fewerRegistrations, 12, 5), null);
+
+  for (const update of [lowerVotes, fewerRegistrations]) {
+    const fixture = subscriptionFixture();
+    fixture.emit(update);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(fixture.snapshots, []);
+    assert.equal(fixture.refreshes, 1);
+    fixture.stop();
+  }
+});
+
 test("lifecycle routes preserve manual activate/close and use nomination open/close", () => {
   assert.equal(typeof leaderboard.getLeaderboardLifecycle, "function");
   const get = (mode, status) => leaderboard.getLeaderboardLifecycle({ eventSlug: "gala", subjectSlug: "singer", mode, status });
@@ -193,6 +210,7 @@ function subscriptionFixture(overrides = {}) {
     get connectionChanged() { return connectionChanged; },
     subscribe: () => subscribed(), fail: () => failed(),
     emit: (value) => listeners.get(".App\\Events\\NominationStatisticsUpdated")?.(value),
+    emitClosed: (value) => listeners.get(".App\\Events\\NominationClosed")?.(value),
   };
 }
 
@@ -277,6 +295,58 @@ test("rejected reauthorization recovers closed REST results and leaves the stale
   assert.equal(fixture.states.at(-1), "disconnected");
   fixture.stop();
   assert.deepEqual(fixture.left, ["events.12.nominations.5"]);
+});
+
+test("a close notice forces REST recovery and leaves the channel after closed status is confirmed", async () => {
+  const closedResults = { ...nominationSnapshot, subject: { ...nominationSnapshot.subject, status: "closed" } };
+  let recovered;
+  let refreshes = 0;
+  const fixture = subscriptionFixture({
+    revalidate: async () => {
+      refreshes++;
+      recovered = closedResults;
+      return recovered;
+    },
+  });
+
+  fixture.emitClosed({ event_id: 12, subject_id: 5, status: "closed" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(refreshes, 1);
+  assert.equal(recovered.subject.status, "closed");
+  assert.deepEqual(fixture.left, ["events.12.nominations.5"]);
+  assert.equal(fixture.listeners.size, 0);
+  assert.equal(fixture.connectionChanged, null);
+  fixture.stop();
+  assert.deepEqual(fixture.left, ["events.12.nominations.5"]);
+});
+
+test("a close notice during an older REST recovery forces a second post-close read", async () => {
+  const closedResults = { ...nominationSnapshot, subject: { ...nominationSnapshot.subject, status: "closed" } };
+  let releaseFirst;
+  let calls = 0;
+  let resolveClosedRead;
+  const closedRead = new Promise((resolve) => { resolveClosedRead = resolve; });
+  const fixture = subscriptionFixture({
+    revalidate: () => {
+      calls++;
+      if (calls === 1) return new Promise((resolve) => { releaseFirst = resolve; });
+      resolveClosedRead();
+      return Promise.resolve(closedResults);
+    },
+  });
+
+  const firstRecovery = fixture.subscribe();
+  await new Promise((resolve) => setImmediate(resolve));
+  fixture.emitClosed({ event_id: 12, subject_id: 5, status: "closed" });
+  releaseFirst(nominationSnapshot);
+  await firstRecovery;
+  await closedRead;
+
+  assert.equal(calls, 2);
+  assert.deepEqual(fixture.left, ["events.12.nominations.5"]);
+  assert.equal(fixture.listeners.size, 0);
+  fixture.stop();
 });
 
 test("failed authorization still recovers REST without claiming an active channel is live", async () => {
