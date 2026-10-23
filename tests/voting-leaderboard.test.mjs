@@ -193,6 +193,44 @@ test("failed channel authorization or recovery never claims stats are current", 
   fixture.stop();
 });
 
+test("rejected reauthorization recovers closed REST results and leaves the stale active channel", async () => {
+  let currentResults = nominationSnapshot;
+  let refreshes = 0;
+  const fixture = subscriptionFixture({
+    revalidate: async () => {
+      refreshes++;
+      if (refreshes > 1) {
+        currentResults = { ...nominationSnapshot, subject: { ...nominationSnapshot.subject, status: "closed" } };
+      }
+      return currentResults;
+    },
+  });
+  await fixture.subscribe();
+  assert.equal(currentResults.subject.status, "active");
+  fixture.connectionChanged("disconnected");
+  fixture.connectionChanged("connected");
+  // A closed subject is no longer authorized to subscribe. No subscription-success event follows.
+  await fixture.fail();
+  assert.equal(refreshes, 2);
+  assert.equal(currentResults.subject.status, "closed");
+  assert.deepEqual(fixture.left, ["events.12.nominations.5"]);
+  assert.equal(fixture.listeners.size, 0);
+  assert.equal(fixture.connectionChanged, null);
+  assert.equal(fixture.states.at(-1), "disconnected");
+  fixture.stop();
+  assert.deepEqual(fixture.left, ["events.12.nominations.5"]);
+});
+
+test("failed authorization still recovers REST without claiming an active channel is live", async () => {
+  const fixture = subscriptionFixture();
+  await fixture.fail();
+  assert.equal(fixture.refreshes, 1);
+  assert.equal(fixture.states.at(-1), "disconnected");
+  assert.equal(fixture.states.includes("connected"), false);
+  assert.deepEqual(fixture.left, []);
+  fixture.stop();
+});
+
 test("missing Reverb configuration reports unavailable and does not subscribe", () => {
   const fixture = subscriptionFixture({ echo: null });
   assert.deepEqual(fixture.states, ["unavailable"]);
