@@ -14,7 +14,7 @@ import api from "@/lib/api";
 import { restoreDialogFocus } from "@/lib/dialog-focus.mjs";
 import { getEcho, getNominationChannelName } from "@/lib/echo";
 import { DEFAULT_RAFFLE_THEME, getRaffleTheme, RAFFLE_THEMES } from "@/lib/raffle-themes.mjs";
-import { getLeaderboardLifecycle, getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, subscribeToNominationLeaderboard } from "@/lib/voting-leaderboard.mjs";
+import { getLeaderboardLifecycle, getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, isNominationStatisticsMonotonic, subscribeToNominationLeaderboard } from "@/lib/voting-leaderboard.mjs";
 import { getVotingSubjectUrl } from "@/lib/voting-subjects.mjs";
 
 function subscribeToVisibility(onChange) {
@@ -127,7 +127,21 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
       mode, status: subjectStatus, onStatus: setConnectionStatus,
       getBaseSnapshot: () => resultsRef.current,
       onSnapshot: (snapshot) => {
-        void mutate((current) => current?.subject?.status === "active" ? snapshot : current, { revalidate: false });
+        let rejectedAsStale = false;
+        void mutate((current) => {
+          if (current?.subject?.status !== "active") return current;
+          if (!isNominationStatisticsMonotonic(snapshot, current)) {
+            rejectedAsStale = true;
+            return current;
+          }
+
+          // SWR's updater runs before React effects. Keep the projection base in
+          // step with the accepted cache value so the next broadcast uses it.
+          resultsRef.current = snapshot;
+          return snapshot;
+        }, { revalidate: false }).then(() => {
+          if (rejectedAsStale) return mutate();
+        }).catch(() => {});
       },
       revalidate: () => mutate(),
     });

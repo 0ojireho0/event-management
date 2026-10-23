@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, projectNominationStatistics } from "../lib/voting-leaderboard.mjs";
+import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, isNominationStatisticsMonotonic, projectNominationStatistics } from "../lib/voting-leaderboard.mjs";
 import * as leaderboard from "../lib/voting-leaderboard.mjs";
 
 test("results fetcher reads the root backend payload from an Axios response", () => {
@@ -158,6 +158,33 @@ test("out-of-order compact snapshots trigger REST recovery instead of rolling to
     assert.equal(fixture.refreshes, 1);
     fixture.stop();
   }
+});
+
+test("the SWR cache guard accepts 5 after 3, then rejects 4 before the React ref effect runs", () => {
+  const base = {
+    ...nominationSnapshot,
+    total_votes: 3,
+    total_registrations: 10,
+    contestants: [{ ...nominationSnapshot.contestants[0], votes: 3 }],
+  };
+  let current = base;
+  const resultsRef = { current };
+  // Both callbacks project against the same old render/ref before the effect can sync it.
+  const candidate5 = projectNominationStatistics(base, { ...compactNominationUpdate, total_votes: 5, contestant_votes: [5] }, 12, 5);
+  const candidate4 = projectNominationStatistics(base, { ...compactNominationUpdate, total_votes: 4, contestant_votes: [4] }, 12, 5);
+  assert.equal(candidate5.total_votes, 5);
+  assert.equal(candidate4.total_votes, 4);
+
+  for (const candidate of [candidate5, candidate4]) {
+    if (isNominationStatisticsMonotonic(candidate, current)) {
+      current = candidate;
+      resultsRef.current = candidate;
+    }
+  }
+
+  assert.equal(current.total_votes, 5);
+  assert.equal(resultsRef.current.total_votes, 5);
+  assert.equal(isNominationStatisticsMonotonic(candidate4, current), false);
 });
 
 test("lifecycle routes preserve manual activate/close and use nomination open/close", () => {
