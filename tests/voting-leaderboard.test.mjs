@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload } from "../lib/voting-leaderboard.mjs";
+import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, projectNominationStatistics } from "../lib/voting-leaderboard.mjs";
 import * as leaderboard from "../lib/voting-leaderboard.mjs";
 
 test("results fetcher reads the root backend payload from an Axios response", () => {
@@ -97,6 +97,52 @@ const nominationSnapshot = {
   contestants: [{ id: 8, name: "Ava", display_order: 0, votes: 2, rank: 1, percentage: 100 }],
 };
 
+const compactNominationUpdate = {
+  event_id: 12,
+  subject_id: 5,
+  status: "active",
+  total_votes: 2,
+  total_registrations: 10,
+  contestant_votes: [2],
+};
+
+test("compact broadcast projects a REST-shaped ranked snapshot from the stable roster", () => {
+  const base = {
+    ...nominationSnapshot,
+    total_votes: 0,
+    participation_percentage: 0,
+    contestants: [
+      { id: 8, name: "Ava", display_order: 1, votes: 0, rank: 1, percentage: 0 },
+      { id: 9, name: "Bea", display_order: 0, votes: 0, rank: 1, percentage: 0 },
+      { id: 10, name: "Cam", display_order: 2, votes: 0, rank: 1, percentage: 0 },
+    ],
+  };
+  const update = { ...compactNominationUpdate, total_votes: 5, total_registrations: 6, contestant_votes: [2, 2, 1] };
+
+  assert.deepEqual(projectNominationStatistics(base, update, 12, 5), {
+    ...base,
+    total_votes: 5,
+    total_registrations: 6,
+    participation_percentage: 83.33,
+    contestants: [
+      { id: 9, name: "Bea", display_order: 0, votes: 2, rank: 1, percentage: 40 },
+      { id: 8, name: "Ava", display_order: 1, votes: 2, rank: 1, percentage: 40 },
+      { id: 10, name: "Cam", display_order: 2, votes: 1, rank: 3, percentage: 20 },
+    ],
+  });
+});
+
+test("compact update rejects missing rosters, mismatched counts, and inconsistent totals", () => {
+  assert.equal(projectNominationStatistics(null, compactNominationUpdate, 12, 5), null);
+  for (const update of [
+    { ...compactNominationUpdate, contestant_votes: [] },
+    { ...compactNominationUpdate, contestant_votes: [1] },
+    { ...compactNominationUpdate, contestant_votes: [Number.MAX_SAFE_INTEGER] },
+    { ...compactNominationUpdate, subject_id: 99 },
+    { ...compactNominationUpdate, status: "closed" },
+  ]) assert.equal(projectNominationStatistics(nominationSnapshot, update, 12, 5), null);
+});
+
 test("lifecycle routes preserve manual activate/close and use nomination open/close", () => {
   assert.equal(typeof leaderboard.getLeaderboardLifecycle, "function");
   const get = (mode, status) => leaderboard.getLeaderboardLifecycle({ eventSlug: "gala", subjectSlug: "singer", mode, status });
@@ -135,7 +181,8 @@ function subscriptionFixture(overrides = {}) {
     echo, channelName: "events.12.nominations.5", eventId: 12, subjectId: 5,
     mode: "nomination", status: "active",
     onSnapshot: (value) => { snapshots.push(value); },
-    revalidate: async () => { refreshes++; },
+    getBaseSnapshot: () => overrides.getBaseSnapshot ? overrides.getBaseSnapshot() : nominationSnapshot,
+    revalidate: async () => { refreshes++; return nominationSnapshot; },
     onStatus: (value) => states.push(value),
     ...overrides,
   });
@@ -149,21 +196,32 @@ function subscriptionFixture(overrides = {}) {
   };
 }
 
-test("a valid aggregate broadcast updates the leaderboard without a REST poll", () => {
+test("a valid compact broadcast updates the REST-shaped leaderboard without a REST poll", () => {
   const fixture = subscriptionFixture();
-  fixture.emit(nominationSnapshot);
+  fixture.emit(compactNominationUpdate);
   assert.deepEqual(fixture.snapshots, [nominationSnapshot]);
   assert.equal(fixture.refreshes, 0);
   fixture.stop();
 });
 
-test("malformed snapshots and snapshots for other event or subject IDs are ignored", () => {
-  const fixture = subscriptionFixture();
-  for (const value of [null, {}, { ...nominationSnapshot, event: { ...nominationSnapshot.event, id: 13 } },
-    { ...nominationSnapshot, subject: { ...nominationSnapshot.subject, id: 6 } },
-    { ...nominationSnapshot, contestants: [{ id: 8 }] },
-    { ...nominationSnapshot, total_votes: "2" },
-    { ...nominationSnapshot, participation_percentage: NaN }]) fixture.emit(value);
+test("malformed compact broadcasts trigger REST recovery instead of replacing cached results", async () => {
+  const invalidPayloads = [null, {}, { ...compactNominationUpdate, event_id: 13 },
+    { ...compactNominationUpdate, subject_id: 6 },
+    { ...compactNominationUpdate, contestant_votes: [] },
+    { ...compactNominationUpdate, contestant_votes: [1] }];
+  for (const payload of invalidPayloads) {
+    const fixture = subscriptionFixture();
+    fixture.emit(payload);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(fixture.snapshots, []);
+    assert.equal(fixture.refreshes, 1);
+    fixture.stop();
+  }
+
+  const fixture = subscriptionFixture({ getBaseSnapshot: () => null });
+  fixture.emit(compactNominationUpdate);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fixture.refreshes, 1);
   assert.deepEqual(fixture.snapshots, []);
   fixture.stop();
 });

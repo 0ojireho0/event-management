@@ -113,22 +113,30 @@ test("leaderboard subscribes privately to the exact Laravel event and leaves wit
     const statuses = [];
     const snapshots = [];
     let refreshed = 0;
+    const base = {
+      event: { id: 12, slug: 'gala', title: 'Gala' },
+      subject: { id: 34, slug: 'singer', title: 'Singer', status: 'active' },
+      total_votes: 0, total_registrations: 2, participation_percentage: 0,
+      contestants: [{ id: 7, name: 'Ava', display_order: 0, votes: 0, rank: 1, percentage: 0 }],
+    };
     const stop = leaderboard.subscribeToNominationLeaderboard({
       echo, channelName: getNominationChannelName(12, 34), eventId: 12, subjectId: 34,
       mode: 'nomination', status: 'active', onStatus: (value) => statuses.push(value),
-      onSnapshot: (value) => snapshots.push(value), revalidate: async () => { refreshed++; },
+      getBaseSnapshot: () => base,
+      onSnapshot: (value) => snapshots.push(value), revalidate: async () => { refreshed++; return base; },
     });
     const channel = echo.connector.channels['private-events.12.nominations.34'];
     assert.ok(channel);
     assert.equal(echo.connector.channels['events.12.nominations.34'], undefined);
-    const snapshot = {
-      event: { id: 12, slug: 'gala', title: 'Gala' },
-      subject: { id: 34, slug: 'singer', title: 'Singer', status: 'active' },
-      total_votes: 1, total_registrations: 2, participation_percentage: 50,
-      contestants: [{ id: 7, name: 'Ava', display_order: 0, votes: 1, rank: 1, percentage: 100 }],
+    const update = {
+      event_id: 12, subject_id: 34, status: 'active', total_votes: 1, total_registrations: 2,
+      contestant_votes: [1],
     };
-    channel.subscription.emit('App\\\\Events\\\\NominationStatisticsUpdated', snapshot);
-    assert.deepEqual(snapshots, [snapshot]);
+    channel.subscription.emit('App\\\\Events\\\\NominationStatisticsUpdated', update);
+    assert.deepEqual(snapshots, [{
+      ...base, total_votes: 1, total_registrations: 2, participation_percentage: 50,
+      contestants: [{ id: 7, name: 'Ava', display_order: 0, votes: 1, rank: 1, percentage: 100 }],
+    }]);
     channel.subscription.emit('pusher:subscription_succeeded', {});
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(refreshed, 1);

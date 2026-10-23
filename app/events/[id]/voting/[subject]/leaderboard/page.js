@@ -86,6 +86,11 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
       isPaused: () => mode === "manual" && visibilityState !== "visible",
     },
   );
+  const resultsRef = useRef(results);
+
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -120,6 +125,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
     return subscribeToNominationLeaderboard({
       echo, channelName: getNominationChannelName(eventId, subjectId), eventId, subjectId,
       mode, status: subjectStatus, onStatus: setConnectionStatus,
+      getBaseSnapshot: () => resultsRef.current,
       onSnapshot: (snapshot) => {
         void mutate((current) => current?.subject?.status === "active" ? snapshot : current, { revalidate: false });
       },
