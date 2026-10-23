@@ -15,12 +15,12 @@ import { VotingSubjectCard } from "@/components/voting/voting-subject-card";
 import { VotingSubjectForm } from "@/components/voting/voting-subject-form";
 import api from "@/lib/api";
 import { restoreDialogFocus } from "@/lib/dialog-focus.mjs";
-import { getNominationUrl } from "@/lib/nomination-voting.mjs";
+import { getNominationUrl, getPublicNominationUrl } from "@/lib/nomination-voting.mjs";
 import { getVotingSubjectUrl } from "@/lib/voting-subjects.mjs";
 
 const confirmCopy = {
-  open: { title: "Open nomination?", description: "Attendees can begin voting in this nomination round. Its title, top N, and nominees can no longer be edited.", button: "Open nomination" },
-  closeNomination: { title: "Close nomination?", description: "Voting in this round will end. A separate voting draft will be created from the top nominees, including ties at the cutoff. The round must have at least one vote.", button: "Close nomination" },
+  open: { title: "Open nomination?", description: "Attendees can begin nominating candidates. The title and finalist count can no longer be edited.", button: "Open nomination" },
+  closeNomination: { title: "Close nomination?", description: "Candidate nominations will end. A separate voting draft will be created from the top nominees, including ties at the cutoff. At least two unique nominees are required to create a voting draft.", button: "Close nomination" },
   activate: { title: "Activate voting?", description: "This ballot will become available to voters. Its title and contestants can no longer be edited.", button: "Activate voting" },
   close: { title: "Close voting?", description: "Voters will no longer be able to cast votes for this subject.", button: "Close voting" },
   delete: { title: "Delete this draft?", description: "This voting subject and its contestants will be removed.", button: "Delete subject" },
@@ -33,6 +33,7 @@ function VotingManagement({ eventSlug, userId }) {
   const [formMode, setFormMode] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [qrSubject, setQrSubject] = useState(null);
+  const [qrPurpose, setQrPurpose] = useState("voting");
   const [busy, setBusy] = useState(null);
   const [actionError, setActionError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
@@ -58,11 +59,27 @@ function VotingManagement({ eventSlug, userId }) {
   }
 
   async function saveNomination(payload) {
-    if (formMode?.subject) await api.patch(getNominationUrl(eventSlug, formMode.subject.slug), payload);
-    else await api.post(getNominationUrl(eventSlug), payload);
-    try { await mutate(); }
+    let saved;
+    if (formMode?.subject) {
+      const response = await api.patch(getNominationUrl(eventSlug, formMode.subject.slug), payload);
+      saved = response.data?.data;
+    } else {
+      const response = await api.post(getNominationUrl(eventSlug), payload);
+      saved = response.data?.data;
+    }
+    let refreshed;
+    try { refreshed = await mutate(); }
     catch { setActionError("The nomination was saved, but the list could not be refreshed. Reload the page to see the latest version."); }
     setFormMode(null);
+    if (!formMode?.subject) {
+      const created = saved?.slug ? saved : refreshed?.find((item) => item.mode === "nomination" && item.title === payload.title);
+      if (created?.slug) {
+        setQrPurpose("nomination");
+        setQrSubject({ ...created, public_url: getPublicNominationUrl(created.slug, window.location.origin) });
+      } else {
+        setActionError("The nomination was created, but its QR link could not be prepared. Use the QR code action on its card.");
+      }
+    }
   }
 
   async function confirmAction() {
@@ -115,11 +132,11 @@ function VotingManagement({ eventSlug, userId }) {
         {isLoading && <div role="status" className="flex min-h-64 items-center justify-center gap-3 text-sm text-[#6f625b]"><LoaderCircle className="size-6 animate-spin text-[#f6671e]" /> Loading voting subjects...</div>}
         {!isLoading && error && <div role="alert" className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-2xl border border-[#ffdece] bg-white p-8 text-center"><CircleAlert className="size-8 text-[#ba1a1a]" /><p>The voting subjects could not be loaded.</p><Button type="button" variant="secondary" onClick={() => mutate()}>Try again</Button></div>}
         {!isLoading && !error && Array.isArray(subjects) && subjects.length === 0 && <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#f3c7b2] bg-white p-8 text-center"><div className="flex size-14 items-center justify-center rounded-2xl bg-[#ffdece] text-[#f6671e]"><Vote className="size-7" /></div><h2 className="text-xl font-bold">No voting subjects yet</h2><p className="max-w-sm text-sm text-[#6f625b]">Create a subject and add at least two contestants to get started.</p><Button type="button" onClick={(event) => openForm(null, event.currentTarget)}><Plus /> Create first subject</Button></div>}
-        {!isLoading && !error && Array.isArray(subjects) && subjects.length > 0 && <section aria-label="Voting subjects" className="grid gap-4 md:grid-cols-2">{subjects.map((subject) => <VotingSubjectCard key={subject.id} subject={subject} eventSlug={eventSlug} busyAction={busy?.id === subject.id ? busy.action : null} onEdit={openForm} onConfirm={(selected, action, opener) => { dialogOpenerRef.current = opener; setActionError(""); setConfirmation({ subject: selected, action }); }} onQr={(selected, opener) => { dialogOpenerRef.current = opener; setQrSubject(selected); }} />)}</section>}
+        {!isLoading && !error && Array.isArray(subjects) && subjects.length > 0 && <section aria-label="Voting subjects" className="grid gap-4 md:grid-cols-2">{subjects.map((subject) => <VotingSubjectCard key={subject.id} subject={subject} eventSlug={eventSlug} busyAction={busy?.id === subject.id ? busy.action : null} onEdit={openForm} onConfirm={(selected, action, opener) => { dialogOpenerRef.current = opener; setActionError(""); setConfirmation({ subject: selected, action }); }} onQr={(selected, opener) => { dialogOpenerRef.current = opener; const nomination = selected.mode === "nomination"; setQrPurpose(nomination ? "nomination" : "voting"); setQrSubject(nomination ? { ...selected, public_url: getPublicNominationUrl(selected.slug, window.location.origin) } : selected); }} />)}</section>}
       </div>
 
-      {formMode?.mode === "nomination" ? <NominationForm key={formMode.subject?.id || "create-nomination"} open subject={formMode.subject} eventSlug={eventSlug} userId={userId} onOpenChange={(open) => { if (!open) setFormMode(null); }} onCloseAutoFocus={restoreFocus} onSave={saveNomination} /> : formMode && <VotingSubjectForm key={formMode.subject?.id || "create"} open subject={formMode.subject} onOpenChange={(open) => { if (!open) setFormMode(null); }} onCloseAutoFocus={restoreFocus} onSave={saveSubject} />}
-      <VotingQrDialog subject={qrSubject} onOpenChange={(open) => { if (!open) setQrSubject(null); }} onCloseAutoFocus={restoreFocus} />
+      {formMode?.mode === "nomination" ? <NominationForm key={formMode.subject?.id || "create-nomination"} open subject={formMode.subject} onOpenChange={(open) => { if (!open) setFormMode(null); }} onCloseAutoFocus={restoreFocus} onSave={saveNomination} /> : formMode && <VotingSubjectForm key={formMode.subject?.id || "create"} open subject={formMode.subject} onOpenChange={(open) => { if (!open) setFormMode(null); }} onCloseAutoFocus={restoreFocus} onSave={saveSubject} />}
+      <VotingQrDialog subject={qrSubject} purpose={qrPurpose} onOpenChange={(open) => { if (!open) setQrSubject(null); }} onCloseAutoFocus={restoreFocus} />
 
       <Dialog open={Boolean(confirmation)} onOpenChange={(open) => { if (!open && !busy) { setConfirmation(null); setActionError(""); } }}>
         <DialogContent className="p-6" onCloseAutoFocus={restoreFocus}>

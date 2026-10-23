@@ -12,9 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { LeaderboardRow } from "@/components/voting/leaderboard-row";
 import api from "@/lib/api";
 import { restoreDialogFocus } from "@/lib/dialog-focus.mjs";
-import { getEcho, getNominationChannelName } from "@/lib/echo";
+import { getEcho, getNominationChannelName, getVotingChannelName } from "@/lib/echo";
 import { DEFAULT_RAFFLE_THEME, getRaffleTheme, RAFFLE_THEMES } from "@/lib/raffle-themes.mjs";
-import { getLeaderboardLifecycle, getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, isNominationStatisticsMonotonic, subscribeToNominationLeaderboard } from "@/lib/voting-leaderboard.mjs";
+import { getLeaderboardLifecycle, getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, isNominationStatisticsMonotonic, subscribeToNominationLeaderboard, subscribeToVotingLeaderboard } from "@/lib/voting-leaderboard.mjs";
 import { getVotingSubjectUrl } from "@/lib/voting-subjects.mjs";
 
 function subscribeToVisibility(onChange) {
@@ -81,7 +81,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
       keepPreviousData: true,
       revalidateOnFocus: false,
       refreshWhenHidden: false,
-      refreshInterval: (latest) => getLeaderboardRefreshInterval({ mode, status: latest?.subject?.status, visibilityState }),
+      refreshInterval: (latest) => getLeaderboardRefreshInterval({ mode, status: latest?.subject?.status, visibilityState, connectionStatus }),
       errorRetryInterval: 3000,
       isPaused: () => mode === "manual" && visibilityState !== "visible",
     },
@@ -111,10 +111,10 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
   const managementHref = `/events/${encodeURIComponent(eventSlug)}/voting`;
   const nomination = mode === "nomination";
   const modeKnown = mode === "manual" || nomination;
-  const live = subjectStatus === "active" && !error && modeKnown && (nomination ? connectionStatus === "connected" : visibilityState === "visible");
+  const live = subjectStatus === "active" && !error && modeKnown && connectionStatus === "connected";
 
   useEffect(() => {
-    if (mode !== "nomination" || subjectStatus !== "active" || !eventId || !subjectId) return;
+    if (!modeKnown || subjectStatus !== "active" || !eventId || !subjectId) return;
     let echo;
     try {
       echo = getEcho();
@@ -122,8 +122,12 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
       // Invalid/unavailable Reverb configuration still permits manual REST refresh.
       echo = null;
     }
-    return subscribeToNominationLeaderboard({
-      echo, channelName: getNominationChannelName(eventId, subjectId), eventId, subjectId,
+    const subscribe = nomination ? subscribeToNominationLeaderboard : subscribeToVotingLeaderboard;
+    const channelName = nomination
+      ? getNominationChannelName(eventId, subjectId)
+      : getVotingChannelName(eventId, subjectId);
+    return subscribe({
+      echo, channelName, eventId, subjectId,
       mode, status: subjectStatus, onStatus: setConnectionStatus,
       getBaseSnapshot: () => resultsRef.current,
       onSnapshot: (snapshot) => {
@@ -145,7 +149,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
       },
       revalidate: () => mutate(),
     });
-  }, [eventId, subjectId, mode, subjectStatus, mutate]);
+  }, [eventId, subjectId, mode, modeKnown, nomination, subjectStatus, mutate]);
 
   async function refreshResults() {
     try {
@@ -196,7 +200,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
           </div>
         </header>
 
-        {results && (!modeKnown || (nomination && subjectStatus === "active" && (!live || error))) && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 shadow-lg"><p className="flex items-start gap-2"><CircleAlert className="mt-0.5 size-4 shrink-0" /><span>{!modeKnown ? "The voting mode could not be determined. Live updates are not available." : connectionStatus === "unavailable" ? "Live updates are unavailable because Reverb is not configured." : connectionStatus === "connecting" ? "Connecting to live updates." : connectionStatus === "recovering" ? "Refreshing results after connecting." : "Live updates are disconnected."} Showing the last available results; they may be out of date.</span></p><Button type="button" variant="secondary" disabled={isValidating} onClick={refreshResults}><RotateCw className={isValidating ? "animate-spin" : ""} /> Refresh results</Button></div>}
+        {results && (!modeKnown || (subjectStatus === "active" && (!live || error))) && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 shadow-lg"><p className="flex items-start gap-2"><CircleAlert className="mt-0.5 size-4 shrink-0" /><span>{!modeKnown ? "The voting mode could not be determined. Live updates are not available." : connectionStatus === "unavailable" ? "Live updates are unavailable because Reverb is not configured." : connectionStatus === "connecting" ? "Connecting to live updates." : connectionStatus === "recovering" ? "Refreshing results after connecting." : "Live updates are disconnected."} Showing the last available results; they may be out of date.</span></p><Button type="button" variant="secondary" disabled={isValidating} onClick={refreshResults}><RotateCw className={isValidating ? "animate-spin" : ""} /> Refresh results</Button></div>}
         {error && results && (!nomination || subjectStatus !== "active") && <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 shadow-lg"><CircleAlert className="mt-0.5 size-4 shrink-0" /> Connection interrupted. Showing the last available results; we will retry automatically.</p>}
         {actionError && !confirmation && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-lg">{actionError}</p>}
 
@@ -205,12 +209,12 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
 
         {results && <>
           <section aria-labelledby="leaderboard-heading" className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-extrabold tracking-[0.16em] text-white/75 uppercase">Standings</p><h2 id="leaderboard-heading" className="mt-1 text-3xl font-black">Contestants</h2></div>{lifecycleAction && <Button type="button" className="font-extrabold text-[#2c1644] shadow-lg hover:brightness-95" style={{ backgroundColor: theme.accent }} onClick={(event) => { dialogOpenerRef.current = event.currentTarget; setActionError(""); setConfirmation(lifecycleAction); }}>{lifecycle.label}</Button>}</div>
-            {results.total_votes === 0 ? <div className="rounded-2xl border-2 border-dashed border-white/55 bg-white/95 px-6 py-12 text-center text-[#25170f] shadow-xl"><Vote className="mx-auto size-10" style={{ color: theme.background }} aria-hidden="true" /><h3 className="mt-4 text-2xl font-extrabold">No votes yet</h3><p className="mt-2 text-base text-[#554766]">Results will appear here when attendees start voting.</p></div> : <ol className="space-y-3">{contestants.map((contestant) => <LeaderboardRow key={contestant.id} contestant={contestant} theme={theme} />)}</ol>}
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-extrabold tracking-[0.16em] text-white/75 uppercase">Standings</p><h2 id="leaderboard-heading" className="mt-1 text-3xl font-black">{nomination ? "Nominees" : "Contestants"}</h2></div>{lifecycleAction && <Button type="button" className="font-extrabold text-[#2c1644] shadow-lg hover:brightness-95" style={{ backgroundColor: theme.accent }} onClick={(event) => { dialogOpenerRef.current = event.currentTarget; setActionError(""); setConfirmation(lifecycleAction); }}>{lifecycle.label}</Button>}</div>
+            {results.total_votes === 0 ? <div className="rounded-2xl border-2 border-dashed border-white/55 bg-white/95 px-6 py-12 text-center text-[#25170f] shadow-xl"><Vote className="mx-auto size-10" style={{ color: theme.background }} aria-hidden="true" /><h3 className="mt-4 text-2xl font-extrabold">No {nomination ? "nominations" : "votes"} yet</h3><p className="mt-2 text-base text-[#554766]">Results will appear here when attendees start {nomination ? "nominating candidates" : "voting"}.</p></div> : <ol className="space-y-3">{contestants.map((contestant) => <LeaderboardRow key={contestant.id} contestant={contestant} theme={theme} resultLabel={nomination ? "nomination" : "vote"} />)}</ol>}
           </section>
 
           <section aria-label="Voting totals" className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/50 bg-white p-5 text-[#25170f] shadow-xl sm:p-6"><div className="flex items-center gap-2 text-base font-bold text-[#554766]"><Vote className="size-5" style={{ color: theme.background }} /> Total votes</div><p className="mt-3 text-5xl font-black tabular-nums sm:text-6xl">{results.total_votes.toLocaleString()}</p></div>
+            <div className="rounded-2xl border border-white/50 bg-white p-5 text-[#25170f] shadow-xl sm:p-6"><div className="flex items-center gap-2 text-base font-bold text-[#554766]"><Vote className="size-5" style={{ color: theme.background }} /> Total {nomination ? "nominations" : "votes"}</div><p className="mt-3 text-5xl font-black tabular-nums sm:text-6xl">{results.total_votes.toLocaleString()}</p></div>
             <div className="rounded-2xl border border-white/50 bg-white p-5 text-[#25170f] shadow-xl sm:p-6"><div className="flex items-center gap-2 text-base font-bold text-[#554766]"><Users className="size-5" style={{ color: theme.background }} /> Registration participation</div><p className="mt-3 text-5xl font-black tabular-nums sm:text-6xl">{results.participation_percentage}%</p><p className="mt-2 text-sm text-[#554766]">Out of {results.total_registrations.toLocaleString()} registered attendees</p></div>
           </section>
         </>}
@@ -218,7 +222,7 @@ function Leaderboard({ eventSlug, subjectSlug, userId }) {
 
       <Dialog open={Boolean(confirmation)} onOpenChange={(open) => { if (!open && !busy) { setConfirmation(null); setActionError(""); } }}>
         <DialogContent className="p-6" onCloseAutoFocus={(event) => restoreDialogFocus(event, dialogOpenerRef.current, managementLinkRef.current)}>
-          <DialogHeader className="pr-8"><DialogTitle>{confirmation === "open" ? "Open nominations?" : confirmation === "activate" ? "Activate voting?" : nomination ? "Close nominations?" : "Close voting?"}</DialogTitle><DialogDescription>{confirmation === "open" ? "This nomination ballot will become available to voters. Its nominees can no longer be edited." : confirmation === "activate" ? "This ballot will become available to voters. Its title and contestants can no longer be edited." : "Voters will no longer be able to cast votes for this subject."}</DialogDescription></DialogHeader>
+          <DialogHeader className="pr-8"><DialogTitle>{confirmation === "open" ? "Open nominations?" : confirmation === "activate" ? "Activate voting?" : nomination ? "Close nominations?" : "Close voting?"}</DialogTitle><DialogDescription>{confirmation === "open" ? "Attendees can submit candidate nominations through the QR link. The title and finalist count can no longer be edited." : confirmation === "activate" ? "This ballot will become available to voters. Its title and contestants can no longer be edited." : nomination ? "Attendees will no longer be able to submit nominations for this round." : "Voters will no longer be able to cast votes for this subject."}</DialogDescription></DialogHeader>
           {actionError && <p role="alert" className="rounded-xl bg-[#ffdad6] px-4 py-3 text-sm text-[#93000a]">{actionError}</p>}
           <DialogFooter><Button type="button" variant="secondary" disabled={busy} onClick={() => { setConfirmation(null); setActionError(""); }}>Cancel</Button><Button type="button" disabled={busy} onClick={confirmLifecycleAction}>{busy ? "Working..." : lifecycle?.label || "Confirm"}</Button></DialogFooter>
         </DialogContent>

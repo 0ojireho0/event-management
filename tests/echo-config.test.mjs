@@ -149,3 +149,50 @@ test("leaderboard subscribes privately to the exact Laravel event and leaves wit
     assert.equal(echo.connector.pusher.connection.state, 'initialized');
   `);
 });
+
+test("regular voting leaderboard subscribes to its private Reverb channel and projects vote updates", () => {
+  runEcho(`${configured}
+    globalThis.window = {};
+    const Pusher = (await import('pusher-js')).default;
+    Pusher.prototype.connect = function () {};
+    const { getEcho, getVotingChannelName } = await import('./lib/echo.js');
+    const leaderboard = await import('./lib/voting-leaderboard.mjs');
+    const assert = (await import('node:assert/strict')).default;
+    assert.equal(typeof leaderboard.subscribeToVotingLeaderboard, 'function');
+    const echo = getEcho();
+    const statuses = [];
+    const snapshots = [];
+    let refreshed = 0;
+    const base = {
+      event: { id: 12, slug: 'gala', title: 'Gala' },
+      subject: { id: 34, slug: 'singer', title: 'Singer', status: 'active' },
+      total_votes: 0, total_registrations: 2, participation_percentage: 0,
+      contestants: [
+        { id: 7, name: 'Ava', display_order: 0, votes: 0, rank: 1, percentage: 0 },
+        { id: 8, name: 'Bea', display_order: 1, votes: 0, rank: 1, percentage: 0 },
+      ],
+    };
+    const stop = leaderboard.subscribeToVotingLeaderboard({
+      echo, channelName: getVotingChannelName(12, 34), eventId: 12, subjectId: 34,
+      mode: 'manual', status: 'active', onStatus: (value) => statuses.push(value),
+      getBaseSnapshot: () => base,
+      onSnapshot: (value) => snapshots.push(value), revalidate: async () => { refreshed++; return base; },
+    });
+    const channel = echo.connector.channels['private-events.12.voting.34'];
+    assert.ok(channel);
+    assert.equal(echo.connector.channels['events.12.voting.34'], undefined);
+    channel.subscription.emit('App\\\\Events\\\\VotingStatisticsUpdated', {
+      event_id: 12, subject_id: 34, status: 'active', total_votes: 1, total_registrations: 2,
+      contestant_votes: [1, 0],
+    });
+    assert.equal(snapshots[0].total_votes, 1);
+    assert.equal(snapshots[0].contestants[0].votes, 1);
+    assert.equal(refreshed, 0);
+    channel.subscription.emit('pusher:subscription_succeeded', {});
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(refreshed, 1);
+    assert.equal(statuses.at(-1), 'connected');
+    stop();
+    assert.equal(echo.connector.channels['private-events.12.voting.34'], undefined);
+  `);
+});

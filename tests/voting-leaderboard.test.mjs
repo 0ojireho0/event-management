@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, isNominationStatisticsMonotonic, projectNominationStatistics } from "../lib/voting-leaderboard.mjs";
+import { getLeaderboardRefreshInterval, getRankedContestants, getVotingResultsPayload, isNominationStatisticsMonotonic, projectNominationStatistics, projectVotingStatistics } from "../lib/voting-leaderboard.mjs";
 import * as leaderboard from "../lib/voting-leaderboard.mjs";
 
 test("results fetcher reads the root backend payload from an Axios response", () => {
@@ -71,8 +71,10 @@ test("first, second, and third places receive distinct podium metadata", () => {
   assert.deepEqual(rows.map(({ podium }) => podium), ["first", "second", "third", null]);
 });
 
-test("active visible manual leaderboard refreshes every three seconds", () => {
+test("manual leaderboard uses quick polling until Reverb connects and slow reconciliation after", () => {
   assert.equal(getLeaderboardRefreshInterval({ mode: "manual", status: "active", visibilityState: "visible" }), 3000);
+  assert.equal(getLeaderboardRefreshInterval({ mode: "manual", status: "active", visibilityState: "visible", connectionStatus: "connecting" }), 3000);
+  assert.equal(getLeaderboardRefreshInterval({ mode: "manual", status: "active", visibilityState: "visible", connectionStatus: "connected" }), 30_000);
 });
 
 test("hidden, draft, and closed leaderboards do not poll", () => {
@@ -130,6 +132,27 @@ test("compact broadcast projects a REST-shaped ranked snapshot from the stable r
       { id: 10, name: "Cam", display_order: 2, votes: 1, rank: 3, percentage: 20 },
     ],
   });
+});
+
+test("manual voting statistics use the same compact REST projection", () => {
+  const base = {
+    ...nominationSnapshot,
+    total_votes: 0,
+    participation_percentage: 0,
+    contestants: [
+      { id: 8, name: "Ava", display_order: 1, votes: 0, rank: 1, percentage: 0 },
+      { id: 9, name: "Bea", display_order: 0, votes: 0, rank: 1, percentage: 0 },
+    ],
+  };
+  const update = { ...compactNominationUpdate, total_votes: 3, total_registrations: 10, contestant_votes: [1, 2] };
+  const result = projectVotingStatistics(base, update, 12, 5);
+
+  assert.equal(result.total_votes, 3);
+  assert.equal(result.participation_percentage, 30);
+  assert.deepEqual(result.contestants.map(({ name, votes, rank }) => ({ name, votes, rank })), [
+    { name: "Bea", votes: 2, rank: 1 },
+    { name: "Ava", votes: 1, rank: 2 },
+  ]);
 });
 
 test("compact update rejects missing rosters, mismatched counts, and inconsistent totals", () => {
